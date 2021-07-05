@@ -1,7 +1,7 @@
 {
-    "name": "backend",
+    "name": "catalogo-backend-v2",
     "version": "2.5.3",
-    "description": "Ts RES API",
+    "description": "API del catálogo de Grupo Roca",
     "main": "index.js",
     "scripts": {
         "start": "node dist/index.js",
