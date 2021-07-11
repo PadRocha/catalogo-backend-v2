@@ -1,5 +1,9 @@
 import { config } from "../config/config";
 
+export interface IRoles {
+    roleIncludes(roles: 'READ' | 'WRITE' | 'EDIT' | 'GRANT' | 'ADMIN' | ('READ' | 'WRITE' | 'EDIT' | 'GRANT' | 'ADMIN')[]): boolean;
+}
+
 const configAuth: { [AUTH: string]: number } = config.AUTH;
 
 export function intoRoles(role: number): string[] {

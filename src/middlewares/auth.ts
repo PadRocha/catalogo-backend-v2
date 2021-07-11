@@ -10,7 +10,8 @@ export async function authorized(req: Request, res: Response, next: (err?: Error
     return res.status(400).send({ message: 'Client has not sent Token' });
   const token = req.headers.authorization.split(' ').pop();
   delete req.headers.authorization
-  if (!token) return res.status(403).send({ message: 'The user does not have the necessary credentials for this operation' });
+  if (!token)
+    return res.status(403).send({ message: 'The user does not have the necessary credentials for this operation' });
   try {
     var payload: Token = <Token>verify(token, <Secret>config.KEY.SECRET);
     const user: IUser | null = await UserModel.findById(payload.sub).select('-password');

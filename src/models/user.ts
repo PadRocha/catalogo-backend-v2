@@ -4,9 +4,9 @@ import bcryptjs from 'bcryptjs';
 import dayjs from 'dayjs';
 
 import { config } from '../config/config';
-import { roleIncludes } from '../services/roles';
+import { IRoles, roleIncludes } from '../services/roles';
 
-export interface IUser extends Document {
+export interface IUser extends Document, IRoles {
     readonly nickname: string;
     readonly sub?: string;
     password?: string;
@@ -14,7 +14,6 @@ export interface IUser extends Document {
     roles?: string[];
     comparePassword(password: string | undefined): boolean;
     createToken(): string;
-    roleIncludes(roles: 'READ' | 'WRITE' | 'EDIT' | 'GRANT' | 'ADMIN' | ('READ' | 'WRITE' | 'EDIT' | 'GRANT' | 'ADMIN')[]): boolean;
 }
 
 export interface IUserModel extends Model<IUser> {
@@ -82,8 +81,4 @@ userSchema.methods.roleIncludes = roleIncludes;
 
 export const UserModel = model<IUser, IUserModel>('User', userSchema);
 
-try {
-    UserModel.createIndexes();
-} catch {
-    //
-}
+UserModel.createIndexes();

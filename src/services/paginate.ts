@@ -1,22 +1,20 @@
 import { Model, Query } from "mongoose";
 
-export interface paginateMetadata {
-    totalDocs: number;
-    limit: number;
-    page: number;
-    nextPage: number | null;
-    prevPage: number | null;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-    totalPages: number;
-}
-
 export interface IPaginate {
     paginate(
         limit: number,
         page: number,
         pipeline?: unknown[] | Query<any, any, any>
-    ): Promise<paginateMetadata>;
+    ): Promise<{
+        totalDocs: number;
+        limit: number;
+        page: number;
+        nextPage: number | null;
+        prevPage: number | null;
+        hasNextPage: boolean;
+        hasPrevPage: boolean;
+        totalPages: number;
+    }>;
 }
 
 export async function paginate(
