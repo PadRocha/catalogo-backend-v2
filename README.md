@@ -137,8 +137,10 @@ export function listDefaultPage({ params }: Request, res: Response) {
         .skip(config.LIMIT.DEFAULT * (page - 1))
         .limit(config.LIMIT.DEFAULT)
         .exec(async (err, data) => {
-            if (err) return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data) return res.status(404).send({ message: 'Document not found' });
+            if (err) 
+return res.status(409).send({ message: 'Internal error, probably error with params' });
+            if (!data) 
+return res.status(404).send({ message: 'Document not found' });
 
             const totalDocs = await DefaultModel.countDocuments();
             const totalPages = Math.ceil(totalDocs / config.LIMIT.DEFAULT);
@@ -172,8 +174,10 @@ export function listDefaultPage({ query }: Request, res: Response) {
     const search = DefaultModel.find();
     
     find.merge(search).exec(async (err, data) => {
-            if (err) return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data) return res.status(404).send({ message: 'Document not found' });
+            if (err) 
+return res.status(409).send({ message: 'Internal error, probably error with params' });
+            if (!data) 
+return res.status(404).send({ message: 'Document not found' });
 
             const totalDocs = await DefaultModel.countDocuments().merge(search);
             const totalPages = Math.ceil(totalDocs / config.LIMIT.DEFAULT);
