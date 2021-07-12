@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { LeanDocument } from 'mongoose';
+import { isValidObjectId, LeanDocument } from 'mongoose';
 import { v2 } from 'cloudinary';
 import { config } from '../config/config';
 import { IImageFile, IKey, KeyModel } from '../models/key';
@@ -12,14 +12,15 @@ v2.config({
 });
 
 export async function saveKey({ body }: Request, res: Response) {
-    if (!body?.line) return res.status(400).send({ message: 'Client has not sent params' });
+    if (!body?.line)
+        return res.status(400).send({ message: 'Client has not sent params' });
 
     body.line = await LineModel.findByIdentifier(body.line).catch(() => {
         return res.status(400).send({ message: 'Client has not sent params' });
     });
 
     const newKey = new KeyModel(body);
-    if (!isNaN(body?.status)) {
+    if (!isNaN(body?.status) && body.status >= 0 && body.status < 5) {
         for (let idN = 0; idN < 3; idN++)
             newKey.image.push(<IImageFile>{ idN, status: body.status });
     }
@@ -33,7 +34,7 @@ export async function saveKey({ body }: Request, res: Response) {
 }
 
 export async function listKey({ query }: Request, res: Response) {
-    if (query.page) {
+    if (query?.page) {
         const page = !isNaN(Number(query.page)) ? Number(query.page) : 1;
         const pipeline = new Array<unknown>({
             $lookup: {
@@ -128,7 +129,7 @@ export async function listKey({ query }: Request, res: Response) {
 
             const { status, percentage } = await KeyModel.infoStatus(pipeline);
 
-            const paginateMetadata = await KeyModel.paginate(config.LIMIT.LINE, page, pipeline)
+            const paginateMetadata = await KeyModel.paginate(config.LIMIT.LINE, page, pipeline);
             return res.status(200).send({
                 data,
                 metadata: {
@@ -138,7 +139,7 @@ export async function listKey({ query }: Request, res: Response) {
                 }
             });
         });
-    } else if (query.id) {
+    } else if (query?.id) {
         KeyModel
             .findOne()
             .where('_id')
@@ -180,7 +181,8 @@ export async function listKey({ query }: Request, res: Response) {
 }
 
 export async function updateKey({ body, query }: Request, res: Response) {
-    if (!query?.id || !body?.line) return res.status(400).send({ message: 'Client has not sent params' });
+    if (!isValidObjectId(query?.id) || !body?.line)
+        return res.status(400).send({ message: 'Client has not sent params' });
 
     body.line = await LineModel.findByIdentifier(body.line).catch(() => {
         return res.status(400).send({ message: 'Client has not sent params' });
@@ -197,7 +199,8 @@ export async function updateKey({ body, query }: Request, res: Response) {
 }
 
 export function deleteKey({ query }: Request, res: Response) {
-    if (!query?.id) return res.status(400).send({ message: 'Client has not sent params' });
+    if (!isValidObjectId(query?.id))
+        return res.status(400).send({ message: 'Client has not sent params' });
     KeyModel.findOneAndDelete({ _id: query.id })
         .exec(async (err, data) => {
             if (err)
@@ -221,12 +224,11 @@ export function deleteKey({ query }: Request, res: Response) {
 }
 
 export async function resetKey({ query, body }: Request, res: Response) {
-    if (query?.id) {
-        const status = Number(body.status);
+    if (isValidObjectId(query?.id)) {
         const image = new Array<LeanDocument<IImageFile>>();
-        if (status < 5)
-            for (let idN = 1; idN < 4; idN++)
-                image.push({ idN, status });
+        if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
+            for (let idN = 0; idN < 3; idN++)
+                image.push({ idN, status: body.status });
 
         KeyModel.findOneAndUpdate({
             _id: query.id
@@ -254,6 +256,11 @@ export async function resetKey({ query, body }: Request, res: Response) {
             return res.status(200).send({ data });
         });
     } else {
+        const image = new Array<LeanDocument<IImageFile>>();
+        if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
+            for (let idN = 0; idN < 3; idN++)
+                image.push({ idN, status: body.status });
+
         const keys = await KeyModel.find({
             image: {
                 $gt: []
@@ -266,7 +273,7 @@ export async function resetKey({ query, body }: Request, res: Response) {
             }
         }, {
             $set: {
-                image: []
+                image
             }
         }).exec(async (err, data) => {
             if (err)

@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import { v2 } from 'cloudinary';
 import { config } from '../config/config';
 import { KeyModel } from "../models/key";
+import { isValidObjectId } from 'mongoose';
 
 v2.config({
     cloud_name: config.CLOUDINARY.NAME,
@@ -12,11 +13,12 @@ v2.config({
 
 export async function updateImage({ params, file }: Request, res: Response) {
     const idN = Number(params.idN);
-    if (!params?.key || idN > 2 || !file)
+    if (!isValidObjectId(params?.key) || idN < 0 || idN > 2 || !file)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     try {
         const cloudinary = await v2.uploader.upload(file.path, { folder: 'products' });
+        await fs.unlink(file.path);
         KeyModel.findOneAndUpdate({
             _id: params.key,
             'image.idN': idN,
@@ -35,15 +37,12 @@ export async function updateImage({ params, file }: Request, res: Response) {
         }).exec(async (err, data) => {
             if (err) {
                 await v2.uploader.destroy(cloudinary.public_id);
-                await fs.unlink(file.path);
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
             }
-
             if (data) {
                 await v2.uploader.destroy(<string>data.image.find(x => x.idN === idN)?.public_id);
-                await fs.unlink(file.path);
                 return res.status(200).send({ data });
-            } else {
+            } else
                 KeyModel.findOneAndUpdate({
                     _id: params.key,
                     'image.idN': idN
@@ -56,10 +55,8 @@ export async function updateImage({ params, file }: Request, res: Response) {
                 }, {
                     new: true
                 }).exec(async (err, data) => {
-                    if (err || !data) {
+                    if (err || !data)
                         await v2.uploader.destroy(cloudinary.public_id);
-                        await fs.unlink(file.path)
-                    }
                     if (err)
                         return res.status(409).send({ message: 'Internal error, probably error with params' });
                     if (!data)
@@ -67,7 +64,6 @@ export async function updateImage({ params, file }: Request, res: Response) {
                     await fs.unlink(file.path);
                     return res.status(200).send({ data });
                 });
-            }
         });
     } catch {
         return res.status(409).send({ message: 'Internal error, probably error with params' });
@@ -76,7 +72,7 @@ export async function updateImage({ params, file }: Request, res: Response) {
 
 export function deleteImage({ params }: Request, res: Response) {
     const idN = Number(params.idN);
-    if (!params.key || idN > 2)
+    if (!isValidObjectId(params?.key) || idN < 0 || idN > 2)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     KeyModel.findOneAndUpdate({

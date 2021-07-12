@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { LeanDocument } from 'mongoose';
+import { isValidObjectId, LeanDocument } from 'mongoose';
 import { v2 } from 'cloudinary';
 import { config } from '../config/config';
-import { KeyModel } from '../models/key';
+import { IImageFile, KeyModel } from '../models/key';
 import { ILine, LineModel } from '../models/line';
 import { SupplierModel } from '../models/supplier';
 
@@ -28,7 +28,7 @@ export async function saveLine({ body }: Request, res: Response) {
 }
 
 export function listLine({ query }: Request, res: Response) {
-    if (query.page) {
+    if (query?.page) {
         const page = !isNaN(Number(query.page)) ? Number(query.page) : 1;
         const pipeline = new Array<unknown>({
             $lookup: {
@@ -52,7 +52,7 @@ export function listLine({ query }: Request, res: Response) {
             }
         });
 
-        if (!!query?.regex && (query?.regex as string).length < 7) {
+        if (!!query?.regex && (query.regex as string).length < 7) {
             const line = (query.regex as string).slice(0, 3);
             pipeline.push({
                 $match: {
@@ -101,7 +101,7 @@ export function listLine({ query }: Request, res: Response) {
             const metadata = await LineModel.paginate(config.LIMIT.LINE, page, pipeline)
             return res.status(200).send({ data, metadata });
         });
-    } else if (query.id) {
+    } else if (query?.id) {
         LineModel
             .findOne()
             .where('_id')
@@ -146,7 +146,8 @@ export function listLine({ query }: Request, res: Response) {
 }
 
 export async function updateLine({ query, body }: Request, res: Response) {
-    if (!query?.id || !body?.supplier) return res.status(400).send({ message: 'Client has not sent params' });
+    if (!isValidObjectId(query?.id) || !body?.supplier)
+        return res.status(400).send({ message: 'Client has not sent params' });
 
     body.supplier = await SupplierModel.findByIdentifier(body.supplier).catch(() => {
         return res.status(400).send({ message: 'Client has not sent params' });
@@ -163,7 +164,8 @@ export async function updateLine({ query, body }: Request, res: Response) {
 }
 
 export function deleteLine({ query }: Request, res: Response) {
-    if (!query?.id) return res.status(400).send({ message: 'Client has not sent params' });
+    if (isValidObjectId(query?.id))
+        return res.status(400).send({ message: 'Client has not sent params' });
     LineModel.findOneAndDelete({ _id: query.id })
         .exec(async (err, data) => {
             if (err)
@@ -194,21 +196,50 @@ export function deleteLine({ query }: Request, res: Response) {
         });
 }
 
-export async function resetLineStatus(req: Request, res: Response) {
-    // const status = Number(req.body.status);
-    // if (!req.params.identifier) return res.status(400).send({ message: 'Client has not sent params' });
-    // const query: MongooseFilterQuery<IKey> = { 'line': req.params.identifier };
-    // const image = new Array<IImage>();
-    // if (status < 5) for (let idN = 1; idN < 4; idN++) image.push(<IImage>{ idN, status });
-    // const update: UpdateQuery<IKey> = { $set: { image } };
-    // Key.find(query).exec((err, key: Array<IKey>) => Key.updateMany(query, update, async err => {
-    //     if (err) return res.status(409).send({ message: 'Batch update process has failed' });
-    //     if (!key) return res.status(404).send({ message: 'Document not found' });
-    //     await Promise.all(
-    //         key.map(async k => await Promise.all(
-    //             k.image.filter(i => i.publicId).map(async i => await v2.uploader.destroy(<string>i.publicId))
-    //         ))
-    //     );
-    //     return res.status(200).send({ data: key });
-    // }));
+export async function resetLine({ query, body }: Request, res: Response) {
+    if (!isValidObjectId(query?.id))
+        return res.status(400).send({ message: 'Client has not sent params' });
+
+    const image = new Array<LeanDocument<IImageFile>>();
+    if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
+        for (let idN = 0; idN < 3; idN++)
+            image.push({ idN, status: body.status });
+
+    const keys = await KeyModel.find({
+        line: <string>query.id,
+        image: {
+            $gt: []
+        }
+    }).select('image -_id');
+
+    KeyModel.updateMany({
+        line: <string>query.id,
+        image: {
+            $gt: []
+        }
+    }, {
+        $set: {
+            image
+        }
+    }).exec(async (err, data) => {
+        if (err)
+            return res.status(409).send({ message: 'Internal error, probably error with params' });
+        if (!data)
+            return res.status(404).send({ message: 'Document not found' });
+
+        await Promise.all(
+            keys.map(async k => await Promise.all(
+                k.image
+                    .filter(i => i.public_id)
+                    .map(async i => {
+                        return await v2.uploader
+                            .destroy(<string>i.public_id)
+                            .catch(e => e);
+                    })
+            ))
+        ).catch(() => {
+            return res.status(409).send({ message: 'Batch removal process has failed' });
+        });
+        return res.status(200).send({ data });
+    });
 }
