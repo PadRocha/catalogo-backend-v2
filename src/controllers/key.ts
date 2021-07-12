@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { isValidObjectId, LeanDocument } from 'mongoose';
+import { Types, LeanDocument } from 'mongoose';
 import { v2 } from 'cloudinary';
 import { config } from '../config/config';
 import { IImageFile, IKey, KeyModel } from '../models/key';
@@ -181,7 +181,7 @@ export async function listKey({ query }: Request, res: Response) {
 }
 
 export async function updateKey({ body, query }: Request, res: Response) {
-    if (!isValidObjectId(query?.id) || !body?.line)
+    if (!Types.ObjectId.isValid(<string>query?.id) || !body?.line)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     body.line = await LineModel.findByIdentifier(body.line).catch(() => {
@@ -199,7 +199,7 @@ export async function updateKey({ body, query }: Request, res: Response) {
 }
 
 export function deleteKey({ query }: Request, res: Response) {
-    if (!isValidObjectId(query?.id))
+    if (!Types.ObjectId.isValid(<string>query?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
     KeyModel.findOneAndDelete({ _id: query.id })
         .exec(async (err, data) => {
@@ -224,7 +224,7 @@ export function deleteKey({ query }: Request, res: Response) {
 }
 
 export async function resetKey({ query, body }: Request, res: Response) {
-    if (isValidObjectId(query?.id)) {
+    if (Types.ObjectId.isValid(<string>query?.id)) {
         const image = new Array<LeanDocument<IImageFile>>();
         if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
             for (let idN = 0; idN < 3; idN++)
@@ -265,7 +265,7 @@ export async function resetKey({ query, body }: Request, res: Response) {
             image: {
                 $gt: []
             }
-        }).select('image -_id');
+        }).select('image');
 
         KeyModel.updateMany({
             image: {
@@ -278,7 +278,7 @@ export async function resetKey({ query, body }: Request, res: Response) {
         }).exec(async (err, data) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data)
+            if (data.nModified === 0)
                 return res.status(404).send({ message: 'Document not found' });
 
             await Promise.all(
@@ -294,7 +294,7 @@ export async function resetKey({ query, body }: Request, res: Response) {
             ).catch(() => {
                 return res.status(409).send({ message: 'Batch removal process has failed' });
             });
-            return res.status(200).send({ data });
+            return res.status(200).send({ data: keys });
         });
     }
 }

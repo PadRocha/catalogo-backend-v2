@@ -1,4 +1,4 @@
-import { Document, isValidObjectId, Model, model, Schema } from 'mongoose';
+import { Document, Types, Model, model, Schema } from 'mongoose';
 import { countDocs, ICountDocs } from '../services/countDocs';
 import { paginate, IPaginate } from '../services/paginate';
 import { IImage } from './image';
@@ -41,7 +41,7 @@ const keySchema = new Schema<IKey, IKeyModel>({
         required: true,
         validate: {
             async validator(_id: string): Promise<boolean> {
-                if (!isValidObjectId(_id)) return false;
+                if (!Types.ObjectId.isValid(_id)) return false;
                 return await LineModel
                     .exists({ _id })
                     .then(exists => exists)

@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import fs from 'fs-extra';
 import { v2 } from 'cloudinary';
 import { config } from '../config/config';
 import { KeyModel } from "../models/key";
-import { isValidObjectId } from 'mongoose';
 
 v2.config({
     cloud_name: config.CLOUDINARY.NAME,
@@ -13,7 +13,7 @@ v2.config({
 
 export async function updateImage({ params, file }: Request, res: Response) {
     const idN = Number(params.idN);
-    if (!isValidObjectId(params?.key) || idN < 0 || idN > 2 || !file)
+    if (!Types.ObjectId.isValid(params?.key) || idN < 0 || idN > 2 || !file)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     try {
@@ -72,7 +72,7 @@ export async function updateImage({ params, file }: Request, res: Response) {
 
 export function deleteImage({ params }: Request, res: Response) {
     const idN = Number(params.idN);
-    if (!isValidObjectId(params?.key) || idN < 0 || idN > 2)
+    if (!Types.ObjectId.isValid(params?.key) || idN < 0 || idN > 2)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     KeyModel.findOneAndUpdate({

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { isValidObjectId } from 'mongoose';
+import { Types } from 'mongoose';
 import { SupplierModel } from '../models/supplier';
 
 export function saveSupplier({ body }: Request, res: Response) {
@@ -24,7 +24,7 @@ export function listSupplier({ }: Request, res: Response) {
 }
 
 export function updateSupplier({ query, body }: Request, res: Response) {
-    if (!isValidObjectId(query?.id) || !body)
+    if (!Types.ObjectId.isValid(<string>query?.id) || !body)
         return res.status(400).send({ message: 'Client has not sent params' });
     SupplierModel.findOneAndUpdate({ _id: <string>query.id }, body)
         .exec((err, data) => {
@@ -36,10 +36,10 @@ export function updateSupplier({ query, body }: Request, res: Response) {
         });
 }
 
-export function deleteSupplier({ query, body }: Request, res: Response) {
-    if (!isValidObjectId(query?.id))
+export function deleteSupplier({ query }: Request, res: Response) {
+    if (!Types.ObjectId.isValid(<string>query?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
-    SupplierModel.findOneAndUpdate({ _id: <string>query.id }, body)
+    SupplierModel.findOneAndDelete({ _id: <string>query.id })
         .exec((err, data) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });

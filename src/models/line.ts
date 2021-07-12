@@ -1,4 +1,4 @@
-import { Document, isValidObjectId, LeanDocument, Model, model, Schema } from 'mongoose';
+import { Document, Types, LeanDocument, Model, model, Schema } from 'mongoose';
 import { paginate, IPaginate } from '../services/paginate';
 import { KeyModel } from './key';
 import { SupplierModel } from './supplier';
@@ -31,7 +31,7 @@ const lineSchema = new Schema<ILine, ILineModel>({
         required: true,
         validate: {
             async validator(_id: string): Promise<boolean> {
-                if (!isValidObjectId(_id)) return false;
+                if (!Types.ObjectId.isValid(_id)) return false;
                 return await SupplierModel
                     .exists({ _id })
                     .then(exists => exists)

@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import { isValidObjectId } from 'mongoose';
+import { Types } from 'mongoose';
 import { KeyModel } from "../models/key";
 
 export function updateStatus({ params, body }: Request, res: Response) {
     const idN = Number(params.idN);
-    if (!isValidObjectId(params?.key) || idN < 0 || idN > 2 || isNaN(body?.status) || body.status < 0 || body.status > 5)
+    if (!Types.ObjectId.isValid(params?.key) || idN < 0 || idN > 2 || isNaN(body?.status) || body.status < 0 || body.status > 5)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     KeyModel.findOneAndUpdate({
@@ -46,7 +46,7 @@ export function updateStatus({ params, body }: Request, res: Response) {
 
 export function deleteStatus({ params }: Request, res: Response) {
     const idN = Number(params?.idN);
-    if (!isValidObjectId(params?.key) || idN < 0 || idN > 2)
+    if (!Types.ObjectId.isValid(params?.key) || idN < 0 || idN > 2)
         return res.status(400).send({ message: 'Client has not sent params' });
     KeyModel.findOneAndUpdate({
         _id: params.key

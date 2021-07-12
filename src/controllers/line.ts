@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { isValidObjectId, LeanDocument } from 'mongoose';
+import { Types, LeanDocument } from 'mongoose';
 import { v2 } from 'cloudinary';
 import { config } from '../config/config';
 import { IImageFile, KeyModel } from '../models/key';
@@ -146,7 +146,7 @@ export function listLine({ query }: Request, res: Response) {
 }
 
 export async function updateLine({ query, body }: Request, res: Response) {
-    if (!isValidObjectId(query?.id) || !body?.supplier)
+    if (!Types.ObjectId.isValid(<string>query?.id) || !body?.supplier)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     body.supplier = await SupplierModel.findByIdentifier(body.supplier).catch(() => {
@@ -164,7 +164,7 @@ export async function updateLine({ query, body }: Request, res: Response) {
 }
 
 export function deleteLine({ query }: Request, res: Response) {
-    if (isValidObjectId(query?.id))
+    if (Types.ObjectId.isValid(<string>query?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
     LineModel.findOneAndDelete({ _id: query.id })
         .exec(async (err, data) => {
@@ -197,7 +197,7 @@ export function deleteLine({ query }: Request, res: Response) {
 }
 
 export async function resetLine({ query, body }: Request, res: Response) {
-    if (!isValidObjectId(query?.id))
+    if (!Types.ObjectId.isValid(<string>query?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
 
     const image = new Array<LeanDocument<IImageFile>>();
@@ -224,7 +224,7 @@ export async function resetLine({ query, body }: Request, res: Response) {
     }).exec(async (err, data) => {
         if (err)
             return res.status(409).send({ message: 'Internal error, probably error with params' });
-        if (!data)
+        if (data.nModified === 0)
             return res.status(404).send({ message: 'Document not found' });
 
         await Promise.all(
@@ -240,6 +240,6 @@ export async function resetLine({ query, body }: Request, res: Response) {
         ).catch(() => {
             return res.status(409).send({ message: 'Batch removal process has failed' });
         });
-        return res.status(200).send({ data });
+        return res.status(200).send({ data: keys });
     });
 }
