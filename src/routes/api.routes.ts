@@ -6,6 +6,7 @@ import * as lineController from '../controllers/line';
 import * as keyController from '../controllers/key';
 import * as statusController from '../controllers/status';
 import * as imageController from '../controllers/image';
+import * as migrationController from '../controllers/migration';
 import { authorized } from '../middlewares/auth';
 
 //*------------------------------------------------------------------*/
@@ -71,6 +72,16 @@ router.route('/status/:key/:idN')
 router.route('/image/:key/:idN')
     .put(authorized, imageController.updateImage)
     .delete(authorized, imageController.deleteImage);
+
+//*------------------------------------------------------------------*/
+// * Migration
+//*------------------------------------------------------------------*/
+
+router.route('/migration/line')
+    .get(migrationController.line);
+
+router.route('/migration/key')
+    .get(migrationController.key);
 
 /*------------------------------------------------------------------*/
 
