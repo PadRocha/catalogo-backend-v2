@@ -49,7 +49,7 @@ router.route('/line')
     .put(authorized, lineController.updateLine)
     .delete(authorized, lineController.deleteLine);
 
-router.route('/line/reset')
+router.route('/line/:id/reset')
     .put(authorized, lineController.resetLine);
 
 //*------------------------------------------------------------------*/

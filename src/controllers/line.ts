@@ -192,8 +192,8 @@ export function deleteLine({ query }: Request, res: Response) {
         });
 }
 
-export async function resetLine({ query, body }: Request, res: Response) {
-    if (!Types.ObjectId.isValid(<string>query?.id))
+export async function resetLine({ params, body }: Request, res: Response) {
+    if (!Types.ObjectId.isValid(params?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
 
     const image = new Array<LeanDocument<IImageFile>>();
@@ -202,14 +202,14 @@ export async function resetLine({ query, body }: Request, res: Response) {
             image.push({ idN, status: body.status });
 
     const keys = await KeyModel.find({
-        line: <string>query.id,
+        line: params.id,
         image: {
             $gt: []
         }
     }).select('image -_id');
 
     KeyModel.updateMany({
-        line: <string>query.id,
+        line: params.id,
         image: {
             $gt: []
         }
