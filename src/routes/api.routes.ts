@@ -66,8 +66,7 @@ router.route('/key/reset')
     .put(authorized, keyController.resetKey);
 
 router.route('/status/:key/:idN')
-    .put(authorized, statusController.updateStatus)
-    .delete(authorized, statusController.deleteStatus);
+    .put(authorized, statusController.updateStatus);
 
 router.route('/image/:key/:idN')
     .put(authorized, imageController.updateImage)

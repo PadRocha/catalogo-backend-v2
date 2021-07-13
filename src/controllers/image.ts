@@ -11,7 +11,9 @@ v2.config({
     api_secret: config.CLOUDINARY.SECRET,
 });
 
-export async function updateImage({ params, file }: Request, res: Response) {
+export async function updateImage({ user, params, file }: Request, res: Response) {
+    if (!user?.roleIncludes(['EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     const idN = Number(params.idN);
     if (!Types.ObjectId.isValid(params?.key) || idN < 0 || idN > 2 || !file)
         return res.status(400).send({ message: 'Client has not sent params' });
@@ -70,7 +72,9 @@ export async function updateImage({ params, file }: Request, res: Response) {
     }
 }
 
-export function deleteImage({ params }: Request, res: Response) {
+export function deleteImage({ user, params }: Request, res: Response) {
+    if (!user?.roleIncludes(['GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     const idN = Number(params.idN);
     if (!Types.ObjectId.isValid(params?.key) || idN < 0 || idN > 2)
         return res.status(400).send({ message: 'Client has not sent params' });

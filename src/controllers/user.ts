@@ -3,7 +3,9 @@ import { Request, Response } from 'express';
 import { UserModel, IUser } from '../models/user';
 import { hasValidRoles, intoRole, intoRoles } from '../services/roles';
 
-export function registerUser({ body }: Request, res: Response) {
+export function registerUser({ user, body }: Request, res: Response) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({ message: 'Access denied' });
     if (!body) return res.status(400).send({ message: 'Client has not sent params' });
     if (!hasValidRoles(body?.roles) && body?.roles)
         return res.status(400).send({ message: 'Roles bundle not supported' });
@@ -66,7 +68,9 @@ export function returnUser({ user, query }: Request, res: Response) {
         return res.status(400).send({ message: 'User failed to pass authentication' });
 }
 
-export function listUser({ }: Request, res: Response) {
+export function listUser({ user }: Request, res: Response) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({ message: 'Access denied' });
     UserModel.find().exec((err, user) => {
         if (err)
             return res.status(409).send({ message: 'Internal error, probably error with params' });

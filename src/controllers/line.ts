@@ -12,7 +12,9 @@ v2.config({
     api_secret: config.CLOUDINARY.SECRET,
 });
 
-export async function saveLine({ body }: Request, res: Response) {
+export async function saveLine({ user, body }: Request, res: Response) {
+    if (!user?.roleIncludes(['GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     if (!body?.supplier) return res.status(400).send({ message: 'Client has not sent params' });
 
     body.supplier = await SupplierModel.findByIdentifier(body.supplier).catch(() => {
@@ -27,7 +29,9 @@ export async function saveLine({ body }: Request, res: Response) {
     });
 }
 
-export function listLine({ query }: Request, res: Response) {
+export function listLine({ user, query }: Request, res: Response) {
+    if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     if (query?.page) {
         const page = !isNaN(Number(query.page)) ? Number(query.page) : 1;
         const pipeline = new Array<unknown>({
@@ -145,7 +149,9 @@ export function listLine({ query }: Request, res: Response) {
     }
 }
 
-export async function updateLine({ query, body }: Request, res: Response) {
+export async function updateLine({ user, query, body }: Request, res: Response) {
+    if (!user?.roleIncludes(['EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     if (!Types.ObjectId.isValid(<string>query?.id) || !body?.supplier)
         return res.status(400).send({ message: 'Client has not sent params' });
 
@@ -163,7 +169,9 @@ export async function updateLine({ query, body }: Request, res: Response) {
         });
 }
 
-export function deleteLine({ query }: Request, res: Response) {
+export function deleteLine({ user, query }: Request, res: Response) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({ message: 'Access denied' });
     if (Types.ObjectId.isValid(<string>query?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
     LineModel.findOneAndDelete({ _id: query.id })
@@ -192,7 +200,9 @@ export function deleteLine({ query }: Request, res: Response) {
         });
 }
 
-export async function resetLine({ params, body }: Request, res: Response) {
+export async function resetLine({ user, params, body }: Request, res: Response) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({ message: 'Access denied' });
     if (!Types.ObjectId.isValid(params?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
 

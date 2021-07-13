@@ -11,7 +11,9 @@ v2.config({
     api_secret: config.CLOUDINARY.SECRET,
 });
 
-export async function saveKey({ body }: Request, res: Response) {
+export async function saveKey({ user, body }: Request, res: Response) {
+    if (!user?.roleIncludes(['GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     if (!body?.line)
         return res.status(400).send({ message: 'Client has not sent params' });
 
@@ -33,7 +35,9 @@ export async function saveKey({ body }: Request, res: Response) {
     });
 }
 
-export async function listKey({ query }: Request, res: Response) {
+export async function listKey({ user, query }: Request, res: Response) {
+    if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     if (query?.page) {
         const page = !isNaN(Number(query.page)) ? Number(query.page) : 1;
         const pipeline = new Array<unknown>({
@@ -180,7 +184,9 @@ export async function listKey({ query }: Request, res: Response) {
     }
 }
 
-export async function updateKey({ body, query }: Request, res: Response) {
+export async function updateKey({ user, body, query }: Request, res: Response) {
+    if (!user?.roleIncludes(['EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     if (!Types.ObjectId.isValid(<string>query?.id) || !body?.line)
         return res.status(400).send({ message: 'Client has not sent params' });
 
@@ -198,7 +204,9 @@ export async function updateKey({ body, query }: Request, res: Response) {
         });
 }
 
-export function deleteKey({ query }: Request, res: Response) {
+export function deleteKey({ user, query }: Request, res: Response) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({ message: 'Access denied' });
     if (!Types.ObjectId.isValid(<string>query?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
     KeyModel.findOneAndDelete({ _id: query.id })
@@ -223,7 +231,9 @@ export function deleteKey({ query }: Request, res: Response) {
         });
 }
 
-export async function resetKey({ query, body }: Request, res: Response) {
+export async function resetKey({ user, query, body }: Request, res: Response) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({ message: 'Access denied' });
     const image = new Array<LeanDocument<IImageFile>>();
     if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
         for (let idN = 0; idN < 3; idN++)

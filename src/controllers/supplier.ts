@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { Types, LeanDocument } from 'mongoose';
+import { Types } from 'mongoose';
 import { v2 } from 'cloudinary';
-import { IKey, KeyModel } from '../models/key';
+import { KeyModel } from '../models/key';
 import { LineModel } from '../models/line';
 import { SupplierModel } from '../models/supplier';
 import { config } from '../config/config';
@@ -12,7 +12,9 @@ v2.config({
     api_secret: config.CLOUDINARY.SECRET,
 });
 
-export function saveSupplier({ body }: Request, res: Response) {
+export function saveSupplier({ user, body }: Request, res: Response) {
+    if (!user?.roleIncludes(['GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     if (!body)
         return res.status(400).send({ message: 'Client has not sent params' });
     new SupplierModel(body).save((err, data) => {
@@ -23,7 +25,9 @@ export function saveSupplier({ body }: Request, res: Response) {
     });
 }
 
-export function listSupplier({ }: Request, res: Response) {
+export function listSupplier({ user }: Request, res: Response) {
+    if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     SupplierModel.find().exec((err, data) => {
         if (err)
             return res.status(409).send({ message: 'Internal error, probably error with params' });
@@ -33,7 +37,9 @@ export function listSupplier({ }: Request, res: Response) {
     });
 }
 
-export function updateSupplier({ query, body }: Request, res: Response) {
+export function updateSupplier({ user, query, body }: Request, res: Response) {
+    if (!user?.roleIncludes(['EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
     if (!Types.ObjectId.isValid(<string>query?.id) || !body)
         return res.status(400).send({ message: 'Client has not sent params' });
     SupplierModel.findOneAndUpdate({ _id: <string>query.id }, body)
@@ -46,7 +52,9 @@ export function updateSupplier({ query, body }: Request, res: Response) {
         });
 }
 
-export function deleteSupplier({ query }: Request, res: Response) {
+export function deleteSupplier({ user, query }: Request, res: Response) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({ message: 'Access denied' });
     if (!Types.ObjectId.isValid(<string>query?.id))
         return res.status(400).send({ message: 'Client has not sent params' });
     SupplierModel.findOneAndDelete({ _id: <string>query.id })
