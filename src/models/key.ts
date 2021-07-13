@@ -1,5 +1,6 @@
 import { Document, Types, Model, model, Schema } from 'mongoose';
 import { countDocs, ICountDocs } from '../services/countDocs';
+import { findAndDeleteMany, IFindAndDeleteMany } from '../services/findAndDeleteMany';
 import { paginate, IPaginate } from '../services/paginate';
 import { IImage } from './image';
 import { LineModel } from './line';
@@ -18,7 +19,7 @@ export interface IKey extends Document {
     readonly updatedAt: Date;
 }
 
-export interface IKeyModel extends Model<IKey>, IPaginate, ICountDocs {
+export interface IKeyModel extends Model<IKey>, IPaginate, ICountDocs, IFindAndDeleteMany<IKey> {
     infoStatus(pipeline: unknown[]): Promise<{
         status: {
             white: number;
@@ -109,6 +110,8 @@ keySchema.pre<IKey>('save', function (next: Function) {
         this.code = '0' + this.code;
     return next();
 });
+
+keySchema.statics.findAndDeleteMany = findAndDeleteMany;
 
 keySchema.statics.countDocs = countDocs;
 

@@ -173,24 +173,20 @@ export function deleteLine({ query }: Request, res: Response) {
             if (!data)
                 return res.status(404).send({ message: 'Document not found' });
             if (query?.force === 'delete' && await KeyModel.exists({ line: data._id })) {
-                const keys = await KeyModel.find({ line: data._id }).select('image -_id');
-                await KeyModel.deleteMany({ line: data._id }).exec(async err => {
-                    if (err)
-                        return res.status(409).send({ message: 'Batch removal process has failed' });
+                try {
+                    const keys = await KeyModel.findAndDeleteMany({ line: data._id });
                     await Promise.all(
                         keys.map(async k => await Promise.all(
                             k.image
                                 .filter(i => i.public_id)
                                 .map(async i => {
-                                    return await v2.uploader
-                                        .destroy(<string>i.public_id)
-                                        .catch(e => e);
+                                    return await v2.uploader.destroy(<string>i.public_id)
                                 })
                         ))
-                    ).catch(() => {
-                        return res.status(409).send({ message: 'Batch removal process has failed' });
-                    });
-                });
+                    );
+                } catch {
+                    return res.status(409).send({ message: 'Batch removal process has failed' });
+                }
             }
             return res.status(200).send({ data });
         });

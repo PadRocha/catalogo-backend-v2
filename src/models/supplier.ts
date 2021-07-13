@@ -1,4 +1,5 @@
 import { Document, LeanDocument, Model, model, Schema } from 'mongoose';
+import { findAndDeleteMany, IFindAndDeleteMany } from '../services/findAndDeleteMany';
 
 export interface ISupplier extends Document {
     readonly identifier: string;
@@ -24,7 +25,6 @@ const supplierSchema = new Schema<ISupplier, ISupplierModel>({
 });
 
 /*------------------------------------------------------------------*/
-
 
 supplierSchema.statics.findByIdentifier = function (identifier: string) {
     return this.aggregate([

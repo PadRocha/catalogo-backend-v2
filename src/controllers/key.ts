@@ -224,12 +224,12 @@ export function deleteKey({ query }: Request, res: Response) {
 }
 
 export async function resetKey({ query, body }: Request, res: Response) {
-    if (Types.ObjectId.isValid(<string>query?.id)) {
-        const image = new Array<LeanDocument<IImageFile>>();
-        if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
-            for (let idN = 0; idN < 3; idN++)
-                image.push({ idN, status: body.status });
+    const image = new Array<LeanDocument<IImageFile>>();
+    if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
+        for (let idN = 0; idN < 3; idN++)
+            image.push({ idN, status: body.status });
 
+    if (Types.ObjectId.isValid(<string>query?.id)) {
         KeyModel.findOneAndUpdate({
             _id: query.id
         }, {
@@ -256,11 +256,6 @@ export async function resetKey({ query, body }: Request, res: Response) {
             return res.status(200).send({ data });
         });
     } else {
-        const image = new Array<LeanDocument<IImageFile>>();
-        if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
-            for (let idN = 0; idN < 3; idN++)
-                image.push({ idN, status: body.status });
-
         const keys = await KeyModel.find({
             image: {
                 $gt: []

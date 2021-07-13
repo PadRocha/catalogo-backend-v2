@@ -35,7 +35,9 @@ router.route('/user/all')
 
 router.route('/supplier')
     .post(authorized, supplierController.saveSupplier)
-    .get(authorized, supplierController.listSupplier);
+    .get(authorized, supplierController.listSupplier)
+    .put(authorized, supplierController.updateSupplier)
+    .delete(authorized, supplierController.deleteSupplier);
 
 //*------------------------------------------------------------------*/
 // * Api Line
