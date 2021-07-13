@@ -1,6 +1,6 @@
 import { CallbackError, FilterQuery, Model } from "mongoose";
 
-export interface IFindAndDeleteMany<T> {
+export interface IFindAndDeleteMany<T> extends Model<T> {
     findAndDeleteMany(filter: FilterQuery<T>, callback?: (err: CallbackError, res: T[] | null) => void): Promise<T[]>;
 }
 

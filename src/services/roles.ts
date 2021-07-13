@@ -1,6 +1,7 @@
+import { Document } from "mongoose";
 import { config } from "../config/config";
 
-export interface IRoles {
+export interface IRoles extends Document {
     roleIncludes(roles: 'READ' | 'WRITE' | 'EDIT' | 'GRANT' | 'ADMIN' | ('READ' | 'WRITE' | 'EDIT' | 'GRANT' | 'ADMIN')[]): boolean;
 }
 
