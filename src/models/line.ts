@@ -95,7 +95,7 @@ lineSchema.statics.findByIdentifier = function (identifier: string) {
             $limit: 1
         }
     ]).then((line: LeanDocument<ILine>[]) => {
-        return line?.pop();
+        return line?.pop() ?? null;
     });
 }
 
