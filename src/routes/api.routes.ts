@@ -77,11 +77,13 @@ router.route('/image/:key/:idN')
 // * Migration
 //*------------------------------------------------------------------*/
 
-router.route('/migration/line')
-    .get(migrationController.line);
+//! Comentados para evitar errores
 
-router.route('/migration/key')
-    .get(migrationController.key);
+// router.route('/migration/line')
+//     .get(migrationController.line);
+
+// router.route('/migration/key')
+//     .get(migrationController.key);
 
 /*------------------------------------------------------------------*/
 

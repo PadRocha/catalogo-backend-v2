@@ -104,7 +104,9 @@ export async function listKey({ user, query }: Request, res: Response) {
                     }
                 });
             }
-        } else if (query?.desc) {
+        }
+
+        if (query?.desc) {
             pipeline.push({
                 $match: {
                     desc: {
