@@ -4,7 +4,7 @@ import { config } from "../config/config";
 type authRole = 'READ' | 'WRITE' | 'EDIT' | 'GRANT' | 'ADMIN';
 
 export interface IRoles extends Document {
-    roleIncludes(roles: authRole | (authRole)[]): boolean;
+    roleIncludes(roles: authRole | authRole[]): boolean;
 }
 
 const configAuth: { [AUTH: string]: number } = config.AUTH;
