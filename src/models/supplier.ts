@@ -7,7 +7,7 @@ export interface ISupplier extends Document {
 };
 
 export interface ISupplierModel extends Model<ISupplier> {
-    findByIdentifier(identifier: string): Promise<LeanDocument<ISupplier> | undefined>;
+    findByIdentifier(identifier: string): Promise<LeanDocument<ISupplier> | null>;
 }
 
 const supplierSchema = new Schema<ISupplier, ISupplierModel>({

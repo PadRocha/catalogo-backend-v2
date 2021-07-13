@@ -15,7 +15,7 @@ export interface ILine extends Document {
 
 export interface ILineModel extends Model<ILine>, IPaginate, IFindAndDeleteMany<ILine> {
     totalKey(id: string): Promise<number>;
-    findByIdentifier(identifier: string): Promise<LeanDocument<ILine> | undefined>;
+    findByIdentifier(identifier: string): Promise<LeanDocument<ILine> | null>;
 }
 
 const lineSchema = new Schema<ILine, ILineModel>({
