@@ -45,15 +45,6 @@ export function listLine({ user, query }: Request, res: Response) {
             $unwind: {
                 path: '$supplier',
             }
-        }, {
-            $project: {
-                'supplier.createdAt': 0,
-                'supplier.updatedAt': 0,
-                'supplier.__v': 0,
-                createdAt: 0,
-                updatedAt: 0,
-                __v: 0
-            }
         });
 
         if (!!query?.regex && (query.regex as string).length < 7) {
@@ -80,14 +71,21 @@ export function listLine({ user, query }: Request, res: Response) {
         }
 
         LineModel.aggregate(pipeline.concat({
-            $skip: config.LIMIT.LINE * (page - 1)
-        }, {
-            $limit: config.LIMIT.LINE
+            $project: {
+                identifier: {
+                    $concat: ['$identifier', '$supplier.identifier']
+                },
+                name: 1
+            }
         }, {
             $sort: {
                 identifier: 1,
                 'supplier.identifier': 1
             }
+        }, {
+            $skip: config.LIMIT.LINE * (page - 1)
+        }, {
+            $limit: config.LIMIT.LINE
         })).exec(async (err, data: LeanDocument<ILine>[]) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });

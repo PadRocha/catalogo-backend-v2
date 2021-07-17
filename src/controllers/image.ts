@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import fs from 'fs-extra';
+import path from 'path';
 import { v2 } from 'cloudinary';
 import { config } from '../config/config';
 import { KeyModel } from "../models/key";
@@ -20,29 +21,42 @@ export async function updateImage({ user, params, file }: Request, res: Response
 
     try {
         const cloudinary = await v2.uploader.upload(file.path, { folder: 'products' });
-        await fs.unlink(file.path);
+        const beforeUpdate = await KeyModel.findOne({
+            _id: params.key,
+            'image.idN': idN,
+            'image.status': 5,
+            'image.url': {
+                $ne: null
+            },
+            'image.public_id': {
+                $ne: null
+            }
+        }).select('image -_id');
         KeyModel.findOneAndUpdate({
             _id: params.key,
             'image.idN': idN,
             'image.status': 5,
-            'image.img': {
+            'image.url': {
                 $ne: null
             },
-            'image.publicId': {
+            'image.public_id': {
                 $ne: null
             }
         }, {
             $set: {
-                'image.$.img': cloudinary.url,
-                'image.$.publicId': cloudinary.public_id
+                'image.$.url': cloudinary.url,
+                'image.$.public_id': cloudinary.public_id
             }
         }).exec(async (err, data) => {
             if (err) {
                 await v2.uploader.destroy(cloudinary.public_id);
+                await fs.unlink(file.path);
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
             }
             if (data) {
-                await v2.uploader.destroy(<string>data.image.find(x => x.idN === idN)?.public_id);
+                if (beforeUpdate)
+                    await v2.uploader.destroy(<string>beforeUpdate.image.find(x => x.idN === idN)?.public_id);
+                await fs.unlink(file.path);
                 return res.status(200).send({ data });
             } else
                 KeyModel.findOneAndUpdate({
@@ -51,14 +65,16 @@ export async function updateImage({ user, params, file }: Request, res: Response
                 }, {
                     $set: {
                         'image.$.status': 5,
-                        'image.$.img': cloudinary.url,
-                        'image.$.publicId': cloudinary.public_id
+                        'image.$.url': cloudinary.url,
+                        'image.$.public_id': cloudinary.public_id
                     }
                 }, {
                     new: true
                 }).exec(async (err, data) => {
-                    if (err || !data)
+                    if (err || !data) {
                         await v2.uploader.destroy(cloudinary.public_id);
+                        await fs.unlink(file.path);
+                    }
                     if (err)
                         return res.status(409).send({ message: 'Internal error, probably error with params' });
                     if (!data)

@@ -21,6 +21,8 @@ export function updateStatus({ user, params, body }: Request, res: Response) {
             $set: {
                 'image.$.status': body.status
             }
+        }, {
+            new: true
         }).exec((err, data) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
@@ -62,6 +64,8 @@ export function updateStatus({ user, params, body }: Request, res: Response) {
                     }
                 }
             }
+        }, {
+            new: true
         }).exec(async (err, data) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });

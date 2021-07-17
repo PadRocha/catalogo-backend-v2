@@ -28,7 +28,7 @@ export const config = {
         SECRET: process.env.CLOUDINARY_SECRET,
     },
     LIMIT: {
-        KEY: 15,
-        LINE: 20
+        KEY: 20,
+        LINE: 16
     }
 } as const;

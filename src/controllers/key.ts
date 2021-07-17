@@ -62,14 +62,6 @@ export async function listKey({ user, query }: Request, res: Response) {
             $unwind: {
                 path: '$line.supplier'
             }
-        }, {
-            $project: {
-                'line.identifier': 1,
-                'line.supplier.identifier': 1,
-                code: 1,
-                desc: 1,
-                image: 1
-            }
         });
 
         if ((query?.regex as string)?.length < 11) {
@@ -118,32 +110,29 @@ export async function listKey({ user, query }: Request, res: Response) {
         }
 
         KeyModel.aggregate(pipeline.concat({
+            $project: {
+                code: {
+                    $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
+                },
+                desc: 1,
+                image: 1
+            }
+        }, {
+            $sort: {
+                code: 1
+            }
+        }, {
             $skip: config.LIMIT.KEY * (page - 1)
         }, {
             $limit: config.LIMIT.KEY
-        }, {
-            $sort: {
-                'line.identifier': 1,
-                'line.supplier.identifier': 1,
-                code: 1
-            }
         })).exec(async (err, data: LeanDocument<IKey>[]) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
             if (!data)
                 return res.status(404).send({ message: 'Document not found' });
 
-            const { status, percentage } = await KeyModel.infoStatus(pipeline);
-
-            const paginateMetadata = await KeyModel.paginate(config.LIMIT.LINE, page, pipeline);
-            return res.status(200).send({
-                data,
-                metadata: {
-                    ...paginateMetadata,
-                    status,
-                    percentage,
-                }
-            });
+            const metadata = await KeyModel.paginate(config.LIMIT.KEY, page, pipeline);
+            return res.status(200).send({ data, metadata });
         });
     } else if (query?.id) {
         KeyModel
@@ -304,4 +293,91 @@ export async function resetKey({ user, query, body }: Request, res: Response) {
             return res.status(200).send({ data: keys });
         });
     }
+}
+
+export async function keysInfo({ query }: Request, res: Response) {
+    const pipeline = new Array<unknown>({
+        $lookup: {
+            from: 'lines',
+            localField: 'line',
+            foreignField: '_id',
+            as: 'line'
+        }
+    }, {
+        $unwind: {
+            path: '$line'
+        }
+    }, {
+        $lookup: {
+            from: 'suppliers',
+            localField: 'line.supplier',
+            foreignField: '_id',
+            as: 'line.supplier'
+        }
+    }, {
+        $unwind: {
+            path: '$line.supplier'
+        }
+    });
+
+    if ((query?.regex as string)?.length < 11) {
+        const line = (query.regex as string).slice(0, 3);
+        pipeline.push({
+            $match: {
+                'line.identifier': {
+                    $regex: `^${line}`,
+                    $options: 'i'
+                }
+            }
+        });
+        if ((query.regex as string).length > 3) {
+            const supplier = (query.regex as string).slice(3, 6);
+            pipeline.push({
+                $match: {
+                    'line.supplier.identifier': {
+                        $regex: `^${supplier}`,
+                        $options: 'i'
+                    }
+                }
+            });
+        }
+        if ((query.regex as string).length > 6) {
+            const code = (query.regex as string).slice(6, 10);
+            pipeline.push({
+                $match: {
+                    code: {
+                        $regex: `^${code}`,
+                        $options: 'i'
+                    }
+                }
+            });
+        }
+    }
+
+    if (query?.desc) {
+        pipeline.push({
+            $match: {
+                desc: {
+                    $regex: query.desc,
+                    $options: 'i'
+                }
+            }
+        });
+    }
+
+    const total = await KeyModel.countDocs(pipeline);
+    const success = await KeyModel.totalSuccess(pipeline);
+    return res.status(200).send({
+        data: {
+            status: {
+                white: await KeyModel.countStatus(pipeline, 0),
+                gray: await KeyModel.countStatus(pipeline, 1),
+                brown: await KeyModel.countStatus(pipeline, 2),
+                blue: await KeyModel.countStatus(pipeline, 3),
+                purple: await KeyModel.countStatus(pipeline, 4),
+                green: await KeyModel.countStatus(pipeline, 5)
+            },
+            percentage: 100 * success / total
+        }
+    });
 }

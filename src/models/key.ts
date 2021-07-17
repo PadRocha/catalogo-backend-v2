@@ -20,17 +20,6 @@ export interface IKey extends Document {
 }
 
 export interface IKeyModel extends Model<IKey>, IPaginate, ICountDocs, IFindAndDeleteMany<IKey> {
-    infoStatus(pipeline: unknown[]): Promise<{
-        status: {
-            white: number;
-            gray: number;
-            brown: number;
-            blue: number;
-            purple: number;
-            green: number;
-        };
-        percentage: number;
-    }>;
     totalSuccess(pipeline: unknown[]): Promise<number>;
     countStatus(pipeline: unknown[], status: 0 | 1 | 2 | 3 | 4 | 5): Promise<number>;
 }
@@ -163,22 +152,6 @@ keySchema.statics.countStatus = function (pipeline: unknown[], status: number) {
             }
         }
     })).then((res: { count: number }[]) => res?.pop()?.count ?? 0);
-}
-
-keySchema.statics.infoStatus = async function (pipeline: unknown[]) {
-    const total = await this.countDocs(pipeline);
-    const success = await this.totalSuccess(pipeline);
-    return {
-        status: {
-            white: await this.countStatus(pipeline, 0),
-            gray: await this.countStatus(pipeline, 1),
-            brown: await this.countStatus(pipeline, 2),
-            blue: await this.countStatus(pipeline, 3),
-            purple: await this.countStatus(pipeline, 4),
-            green: await this.countStatus(pipeline, 5)
-        },
-        percentage: 100 * success / total
-    };
 }
 
 /*------------------------------------------------------------------*/
