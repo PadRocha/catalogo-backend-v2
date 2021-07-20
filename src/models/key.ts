@@ -19,6 +19,18 @@ export interface IKey extends Document {
     readonly updatedAt: Date;
 }
 
+export interface keyInfo {
+    status?: {
+        white?: number;
+        gray?: number;
+        brown?: number;
+        blue?: number;
+        purple?: number;
+        green?: number;
+    };
+    percentage: number;
+}
+
 export interface IKeyModel extends Model<IKey>, IPaginate, ICountDocs, IFindAndDeleteMany<IKey> {
     totalSuccess(pipeline: unknown[]): Promise<number>;
     countStatus(pipeline: unknown[], status: 0 | 1 | 2 | 3 | 4 | 5): Promise<number>;

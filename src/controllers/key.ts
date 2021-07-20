@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Types, LeanDocument } from 'mongoose';
 import { v2 } from 'cloudinary';
 import { config } from '../config/config';
-import { IImageFile, IKey, KeyModel } from '../models/key';
+import { IImageFile, IKey, keyInfo, KeyModel } from '../models/key';
 import { LineModel } from '../models/line';
 
 v2.config({
@@ -320,7 +320,9 @@ export async function keysInfo({ query }: Request, res: Response) {
         }
     });
 
-    if ((query?.regex as string)?.length < 11) {
+    if (Array.isArray(query?.regex)) {
+
+    } else if ((query?.regex as string)?.length < 11) {
         const line = (query.regex as string).slice(0, 3);
         pipeline.push({
             $match: {
@@ -365,19 +367,136 @@ export async function keysInfo({ query }: Request, res: Response) {
         });
     }
 
-    const total = await KeyModel.countDocs(pipeline);
-    const success = await KeyModel.totalSuccess(pipeline);
-    return res.status(200).send({
-        data: {
-            status: {
-                white: await KeyModel.countStatus(pipeline, 0),
-                gray: await KeyModel.countStatus(pipeline, 1),
-                brown: await KeyModel.countStatus(pipeline, 2),
-                blue: await KeyModel.countStatus(pipeline, 3),
-                purple: await KeyModel.countStatus(pipeline, 4),
-                green: await KeyModel.countStatus(pipeline, 5)
-            },
-            percentage: 100 * success / total
+    KeyModel.aggregate(pipeline.concat({
+        $facet: {
+            status: [{
+                $unwind: {
+                    path: '$image'
+                }
+            }, {
+                $group: {
+                    _id: '$image.status',
+                    count: {
+                        $sum: 1
+                    }
+                }
+            }],
+            success: [{
+                $unwind: {
+                    path: '$image'
+                }
+            }, {
+                $match: {
+                    'image.status': 5
+                }
+            }, {
+                $group: {
+                    _id: {
+                        line: '$line',
+                        code: '$code'
+                    },
+                    image: {
+                        $first: '$image'
+                    }
+                }
+            }, {
+                $group: {
+                    _id: null,
+                    count: {
+                        $sum: 1
+                    }
+                }
+            }],
+            total: [{
+                $group: {
+                    _id: null,
+                    count: {
+                        $sum: 1
+                    }
+                }
+            }]
         }
+    }, {
+        $unwind: {
+            path: '$success'
+        }
+    }, {
+        $unwind: {
+            path: '$total'
+        }
+    }, {
+        $project: {
+            status: {
+                $arrayToObject: {
+                    $map: {
+                        input: '$status',
+                        as: 'st',
+                        in: {
+                            k: {
+                                $switch: {
+                                    branches: [{
+                                        case: {
+                                            $eq: ['$$st._id', 0]
+                                        },
+                                        then: 'white'
+                                    }, {
+                                        case: {
+                                            $eq: ['$$st._id', 1]
+                                        },
+                                        then: 'gray'
+                                    }, {
+                                        case: {
+                                            $eq: ['$$st._id', 2]
+                                        },
+                                        then: 'brown'
+                                    }, {
+                                        case: {
+                                            $eq: ['$$st._id', 3]
+                                        },
+                                        then: 'blue'
+                                    }, {
+                                        case: {
+                                            $eq: ['$$st._id', 4]
+                                        },
+                                        then: 'purple'
+                                    }, {
+                                        case: {
+                                            $eq: ['$$st._id', 5]
+                                        },
+                                        then: 'green'
+                                    }],
+                                    default: 'status'
+                                }
+                            },
+                            v: '$$st.count'
+                        }
+                    }
+                }
+            },
+            percentage: {
+                $divide: [{ $multiply: [100, '$success.count'] }, '$total.count']
+            }
+        }
+    })).exec((err, data: keyInfo[]) => {
+        if (err)
+            return res.status(409).send({ message: 'Internal error, probably error with params' });
+        if (!data)
+            return res.status(404).send({ message: 'Document not found' });
+
+        const info = data.pop();
+        return res.status(200).send({
+            data: {
+                status: {
+                    white: info?.status?.white ?? 0,
+                    gray: info?.status?.gray ?? 0,
+                    brown: info?.status?.brown ?? 0,
+                    blue: info?.status?.blue ?? 0,
+                    purple: info?.status?.purple ?? 0,
+                    green: info?.status?.green ?? 0,
+                },
+                percentage: info?.percentage ?? 0
+            }
+        });
+
     });
 }
