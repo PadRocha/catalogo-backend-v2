@@ -71,27 +71,48 @@ export function listLine({ user, query }: Request, res: Response) {
         }
 
         LineModel.aggregate(pipeline.concat({
+            $facet: {
+                data: [{
+                    $project: {
+                        identifier: {
+                            $concat: ['$identifier', '$supplier.identifier']
+                        },
+                        name: 1
+                    }
+                }, {
+                    $sort: {
+                        identifier: 1
+                    }
+                }, {
+                    $skip: config.LIMIT.LINE * (page - 1)
+                }, {
+                    $limit: config.LIMIT.LINE
+                }],
+                total: [{
+                    $group: {
+                        _id: null,
+                        count: {
+                            $sum: 1
+                        }
+                    }
+                }]
+            }
+        }, {
+            $unwind: {
+                path: '$total'
+            }
+        }, {
             $project: {
-                identifier: {
-                    $concat: ['$identifier', '$supplier.identifier']
-                },
-                name: 1
+                data: 1,
+                totalDocs: '$total.count'
             }
-        }, {
-            $sort: {
-                identifier: 1,
-                'supplier.identifier': 1
-            }
-        }, {
-            $skip: config.LIMIT.LINE * (page - 1)
-        }, {
-            $limit: config.LIMIT.LINE
-        })).exec(async (err, data: LeanDocument<ILine>[]) => {
+        })).exec(async (err, [locations]: { data: LeanDocument<ILine>[]; totalDocs: number }[]) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data)
+            if (!locations)
                 return res.status(404).send({ message: 'Document not found' });
 
+            let { data, totalDocs } = locations;
             if (query?.count === 'key')
                 data = await Promise.all(data.map(async line => {
                     return {
@@ -100,8 +121,22 @@ export function listLine({ user, query }: Request, res: Response) {
                     }
                 }));
 
-            const metadata = await LineModel.paginate(config.LIMIT.LINE, page, pipeline)
-            return res.status(200).send({ data, metadata });
+            const totalPages = Math.ceil(totalDocs / config.LIMIT.LINE);
+            const hasNextPage = totalPages > page;
+            const hasPrevPage = page > 1;
+            return res.status(200).send({
+                data,
+                metadata: {
+                    totalDocs,
+                    limit: config.LIMIT.LINE,
+                    page,
+                    nextPage: hasNextPage ? page + 1 : null,
+                    prevPage: hasPrevPage ? page - 1 : null,
+                    hasNextPage,
+                    hasPrevPage,
+                    totalPages
+                }
+            });
         });
     } else if (query?.id) {
         LineModel

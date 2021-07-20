@@ -110,29 +110,65 @@ export async function listKey({ user, query }: Request, res: Response) {
         }
 
         KeyModel.aggregate(pipeline.concat({
+            $facet: {
+                data: [{
+                    $project: {
+                        code: {
+                            $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
+                        },
+                        desc: 1,
+                        image: 1
+                    }
+                }, {
+                    $sort: {
+                        code: 1
+                    }
+                }, {
+                    $skip: config.LIMIT.KEY * (page - 1)
+                }, {
+                    $limit: config.LIMIT.KEY
+                }],
+                total: [{
+                    $group: {
+                        _id: null,
+                        count: {
+                            $sum: 1
+                        }
+                    }
+                }]
+            }
+        }, {
+            $unwind: {
+                path: '$total'
+            }
+        }, {
             $project: {
-                code: {
-                    $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
-                },
-                desc: 1,
-                image: 1
+                data: 1,
+                totalDocs: '$total.count'
             }
-        }, {
-            $sort: {
-                code: 1
-            }
-        }, {
-            $skip: config.LIMIT.KEY * (page - 1)
-        }, {
-            $limit: config.LIMIT.KEY
-        })).exec(async (err, data: LeanDocument<IKey>[]) => {
+        })).exec((err, [locations]: { data: LeanDocument<IKey>[]; totalDocs: number }[]) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data)
+            if (!locations)
                 return res.status(404).send({ message: 'Document not found' });
+            let { data, totalDocs } = locations;
 
-            const metadata = await KeyModel.paginate(config.LIMIT.KEY, page, pipeline);
-            return res.status(200).send({ data, metadata });
+            const totalPages = Math.ceil(totalDocs / config.LIMIT.KEY);
+            const hasNextPage = totalPages > page;
+            const hasPrevPage = page > 1;
+            return res.status(200).send({
+                data,
+                metadata: {
+                    totalDocs,
+                    limit: config.LIMIT.KEY,
+                    page,
+                    nextPage: hasNextPage ? page + 1 : null,
+                    prevPage: hasPrevPage ? page - 1 : null,
+                    hasNextPage,
+                    hasPrevPage,
+                    totalPages
+                }
+            });
         });
     } else if (query?.id) {
         KeyModel
