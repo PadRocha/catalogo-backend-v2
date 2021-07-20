@@ -20,15 +20,16 @@ export interface IKey extends Document {
 }
 
 export interface keyInfo {
-    status?: {
-        white?: number;
-        gray?: number;
-        brown?: number;
-        blue?: number;
-        purple?: number;
-        green?: number;
+    readonly status?: {
+        readonly defective?: number;
+        readonly found?: number;
+        readonly photographed?: number;
+        readonly prepared?: number;
+        readonly edited?: number;
+        readonly saved?: number;
     };
-    percentage: number;
+    readonly total?: number;
+    readonly success?: number;
 }
 
 export interface IKeyModel extends Model<IKey>, IPaginate, ICountDocs, IFindAndDeleteMany<IKey> {

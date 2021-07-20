@@ -438,32 +438,32 @@ export async function keysInfo({ query }: Request, res: Response) {
                                         case: {
                                             $eq: ['$$st._id', 0]
                                         },
-                                        then: 'white'
+                                        then: 'defective'
                                     }, {
                                         case: {
                                             $eq: ['$$st._id', 1]
                                         },
-                                        then: 'gray'
+                                        then: 'found'
                                     }, {
                                         case: {
                                             $eq: ['$$st._id', 2]
                                         },
-                                        then: 'brown'
+                                        then: 'photographed'
                                     }, {
                                         case: {
                                             $eq: ['$$st._id', 3]
                                         },
-                                        then: 'blue'
+                                        then: 'prepared'
                                     }, {
                                         case: {
                                             $eq: ['$$st._id', 4]
                                         },
-                                        then: 'purple'
+                                        then: 'edited'
                                     }, {
                                         case: {
                                             $eq: ['$$st._id', 5]
                                         },
-                                        then: 'green'
+                                        then: 'saved'
                                     }],
                                     default: 'status'
                                 }
@@ -473,28 +473,25 @@ export async function keysInfo({ query }: Request, res: Response) {
                     }
                 }
             },
-            percentage: {
-                $divide: [{ $multiply: [100, '$success.count'] }, '$total.count']
-            }
+            total: '$total.count',
+            success: '$success.count'
         }
-    })).exec((err, data: keyInfo[]) => {
+    })).exec((err, [data]: keyInfo[]) => {
         if (err)
             return res.status(409).send({ message: 'Internal error, probably error with params' });
-        if (!data)
-            return res.status(404).send({ message: 'Document not found' });
 
-        const info = data.pop();
         return res.status(200).send({
             data: {
                 status: {
-                    white: info?.status?.white ?? 0,
-                    gray: info?.status?.gray ?? 0,
-                    brown: info?.status?.brown ?? 0,
-                    blue: info?.status?.blue ?? 0,
-                    purple: info?.status?.purple ?? 0,
-                    green: info?.status?.green ?? 0,
+                    defective: data?.status?.defective ?? 0,
+                    found: data?.status?.found ?? 0,
+                    photographed: data?.status?.photographed ?? 0,
+                    prepared: data?.status?.prepared ?? 0,
+                    edited: data?.status?.edited ?? 0,
+                    saved: data?.status?.saved ?? 0,
                 },
-                percentage: info?.percentage ?? 0
+                total: data?.total ?? 0,
+                success: data?.success ?? 0
             }
         });
 
