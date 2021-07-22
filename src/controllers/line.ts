@@ -98,6 +98,29 @@ export function listLine({ user, query }: Request, res: Response) {
                 }]
             }
         }, {
+            $project: {
+                data: {
+                    $cond: {
+                        if: {
+                            $eq: ['$data', []]
+                        },
+                        then: null,
+                        else: '$data'
+                    }
+                },
+                total: {
+                    $cond: {
+                        if: {
+                            $eq: ['$total', []]
+                        },
+                        then: [{
+                            count: 0
+                        }],
+                        else: '$total'
+                    }
+                },
+            }
+        }, {
             $unwind: {
                 path: '$total'
             }
@@ -106,13 +129,12 @@ export function listLine({ user, query }: Request, res: Response) {
                 data: 1,
                 totalDocs: '$total.count'
             }
-        })).exec(async (err, [locations]: { data: LeanDocument<ILine>[]; totalDocs: number }[]) => {
+        })).exec(async (err, [{ data, totalDocs }]: { data: LeanDocument<ILine>[]; totalDocs: number }[]) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!locations)
+            if (!data)
                 return res.status(404).send({ message: 'Document not found' });
 
-            let { data, totalDocs } = locations;
             if (query?.count === 'key')
                 data = await Promise.all(data.map(async line => {
                     return {

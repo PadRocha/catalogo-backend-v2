@@ -64,38 +64,48 @@ export async function listKey({ user, query }: Request, res: Response) {
             }
         });
 
-        if ((query?.regex as string)?.length < 11) {
-            const line = (query.regex as string).slice(0, 3);
-            pipeline.push({
-                $match: {
-                    'line.identifier': {
-                        $regex: `^${line}`,
-                        $options: 'i'
+        if (query?.regex) {
+            const request = Array.isArray(query.regex) ? query.regex : new Array(query.regex);
+            const $or = new Array<unknown>();
+            request.forEach((value: any) => {
+                const $and = new Array<unknown>();
+                if ((value as string)?.length < 11) {
+                    const line = (value as string).slice(0, 3);
+                    $and.push({
+                        'line.identifier': {
+                            $regex: `^${line}`,
+                            $options: 'i'
+                        }
+                    });
+
+                    if ((value as string).length > 3) {
+                        const supplier = (value as string).slice(3, 6);
+                        $and.push({
+                            'line.supplier.identifier': {
+                                $regex: `^${supplier}`,
+                                $options: 'i'
+                            }
+                        });
+                    }
+                    if ((value as string).length > 6) {
+                        const code = (value as string).slice(6, 10);
+                        $and.push({
+                            code: {
+                                $regex: `^${code}`,
+                                $options: 'i'
+                            }
+                        });
                     }
                 }
+
+                $or.push({ $and });
             });
-            if ((query.regex as string).length > 3) {
-                const supplier = (query.regex as string).slice(3, 6);
-                pipeline.push({
-                    $match: {
-                        'line.supplier.identifier': {
-                            $regex: `^${supplier}`,
-                            $options: 'i'
-                        }
-                    }
-                });
-            }
-            if ((query.regex as string).length > 6) {
-                const code = (query.regex as string).slice(6, 10);
-                pipeline.push({
-                    $match: {
-                        code: {
-                            $regex: `^${code}`,
-                            $options: 'i'
-                        }
-                    }
-                });
-            }
+
+            pipeline.push({
+                $match: {
+                    $or
+                }
+            })
         }
 
         if (query?.desc) {
@@ -138,6 +148,29 @@ export async function listKey({ user, query }: Request, res: Response) {
                 }]
             }
         }, {
+            $project: {
+                data: {
+                    $cond: {
+                        if: {
+                            $eq: ['$data', []]
+                        },
+                        then: null,
+                        else: '$data'
+                    }
+                },
+                total: {
+                    $cond: {
+                        if: {
+                            $eq: ['$total', []]
+                        },
+                        then: [{
+                            count: 0
+                        }],
+                        else: '$total'
+                    }
+                },
+            }
+        }, {
             $unwind: {
                 path: '$total'
             }
@@ -146,12 +179,11 @@ export async function listKey({ user, query }: Request, res: Response) {
                 data: 1,
                 totalDocs: '$total.count'
             }
-        })).exec((err, [locations]: { data: LeanDocument<IKey>[]; totalDocs: number }[]) => {
+        })).exec((err, [{ data, totalDocs }]: { data: LeanDocument<IKey>[]; totalDocs: number }[]) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!locations)
+            if (!data)
                 return res.status(404).send({ message: 'Document not found' });
-            let { data, totalDocs } = locations;
 
             const totalPages = Math.ceil(totalDocs / config.LIMIT.KEY);
             const hasNextPage = totalPages > page;
@@ -356,40 +388,48 @@ export async function keysInfo({ query }: Request, res: Response) {
         }
     });
 
-    if (Array.isArray(query?.regex)) {
+    if (query?.regex) {
+        const request = Array.isArray(query.regex) ? query.regex : new Array(query.regex);
+        const $or = new Array<unknown>();
+        request.forEach((value: any) => {
+            const $and = new Array<unknown>();
+            if ((value as string)?.length < 11) {
+                const line = (value as string).slice(0, 3);
+                $and.push({
+                    'line.identifier': {
+                        $regex: `^${line}`,
+                        $options: 'i'
+                    }
+                });
 
-    } else if ((query?.regex as string)?.length < 11) {
-        const line = (query.regex as string).slice(0, 3);
-        pipeline.push({
-            $match: {
-                'line.identifier': {
-                    $regex: `^${line}`,
-                    $options: 'i'
+                if ((value as string).length > 3) {
+                    const supplier = (value as string).slice(3, 6);
+                    $and.push({
+                        'line.supplier.identifier': {
+                            $regex: `^${supplier}`,
+                            $options: 'i'
+                        }
+                    });
+                }
+                if ((value as string).length > 6) {
+                    const code = (value as string).slice(6, 10);
+                    $and.push({
+                        code: {
+                            $regex: `^${code}`,
+                            $options: 'i'
+                        }
+                    });
                 }
             }
+
+            $or.push({ $and });
         });
-        if ((query.regex as string).length > 3) {
-            const supplier = (query.regex as string).slice(3, 6);
-            pipeline.push({
-                $match: {
-                    'line.supplier.identifier': {
-                        $regex: `^${supplier}`,
-                        $options: 'i'
-                    }
-                }
-            });
-        }
-        if ((query.regex as string).length > 6) {
-            const code = (query.regex as string).slice(6, 10);
-            pipeline.push({
-                $match: {
-                    code: {
-                        $regex: `^${code}`,
-                        $options: 'i'
-                    }
-                }
-            });
-        }
+
+        pipeline.push({
+            $match: {
+                $or
+            }
+        });
     }
 
     if (query?.desc) {
@@ -453,6 +493,32 @@ export async function keysInfo({ query }: Request, res: Response) {
             }]
         }
     }, {
+        $project: {
+            status: 1,
+            success: {
+                $cond: {
+                    if: {
+                        $eq: ['$success', []]
+                    },
+                    then: [{
+                        count: 0
+                    }],
+                    else: '$status'
+                }
+            },
+            total: {
+                $cond: {
+                    if: {
+                        $eq: ['$total', []]
+                    },
+                    then: [{
+                        count: 0
+                    }],
+                    else: '$total'
+                }
+            }
+        }
+    }, {
         $unwind: {
             path: '$success'
         }
@@ -463,48 +529,75 @@ export async function keysInfo({ query }: Request, res: Response) {
     }, {
         $project: {
             status: {
-                $arrayToObject: {
-                    $map: {
-                        input: '$status',
-                        as: 'st',
-                        in: {
-                            k: {
-                                $switch: {
-                                    branches: [{
-                                        case: {
-                                            $eq: ['$$st._id', 0]
-                                        },
-                                        then: 'defective'
-                                    }, {
-                                        case: {
-                                            $eq: ['$$st._id', 1]
-                                        },
-                                        then: 'found'
-                                    }, {
-                                        case: {
-                                            $eq: ['$$st._id', 2]
-                                        },
-                                        then: 'photographed'
-                                    }, {
-                                        case: {
-                                            $eq: ['$$st._id', 3]
-                                        },
-                                        then: 'prepared'
-                                    }, {
-                                        case: {
-                                            $eq: ['$$st._id', 4]
-                                        },
-                                        then: 'edited'
-                                    }, {
-                                        case: {
-                                            $eq: ['$$st._id', 5]
-                                        },
-                                        then: 'saved'
-                                    }],
-                                    default: 'status'
+                $cond: {
+                    if: {
+                        $eq: ['$status', []]
+                    },
+                    then: {
+                        defective: {
+                            $literal: 0
+                        },
+                        found: {
+                            $literal: 0
+                        },
+                        photographed: {
+                            $literal: 0
+                        },
+                        prepared: {
+                            $literal: 0
+                        },
+                        edited: {
+                            $literal: 0
+                        },
+                        saved: {
+                            $literal: 0
+                        },
+                    },
+                    else: {
+                        $arrayToObject: {
+                            $map: {
+                                input: '$status',
+                                as: 'st',
+                                in: {
+                                    k: {
+                                        $switch: {
+                                            branches: [{
+                                                case: {
+                                                    $eq: ['$$st._id', 0]
+                                                },
+                                                then: 'defective'
+                                            }, {
+                                                case: {
+                                                    $eq: ['$$st._id', 1]
+                                                },
+                                                then: 'found'
+                                            }, {
+                                                case: {
+                                                    $eq: ['$$st._id', 2]
+                                                },
+                                                then: 'photographed'
+                                            }, {
+                                                case: {
+                                                    $eq: ['$$st._id', 3]
+                                                },
+                                                then: 'prepared'
+                                            }, {
+                                                case: {
+                                                    $eq: ['$$st._id', 4]
+                                                },
+                                                then: 'edited'
+                                            }, {
+                                                case: {
+                                                    $eq: ['$$st._id', 5]
+                                                },
+                                                then: 'saved'
+                                            }],
+                                            default: 'status'
+                                        }
+                                    },
+                                    v: '$$st.count'
                                 }
-                            },
-                            v: '$$st.count'
+                            }
                         }
                     }
                 }
