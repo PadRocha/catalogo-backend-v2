@@ -45,41 +45,46 @@ export function listLine({ user, query }: Request, res: Response) {
             $unwind: {
                 path: '$supplier',
             }
+        }, {
+            $project: {
+                identifier: {
+                    $concat: ['$identifier', '$supplier.identifier']
+                },
+                name: 1
+            }
         });
 
-        if (!!query?.regex && (query.regex as string).length < 7) {
-            const line = (query.regex as string).slice(0, 3);
-            pipeline.push({
-                $match: {
-                    identifier: {
-                        $regex: `^${line}`,
-                        $options: 'i'
-                    }
+        const $and = new Array<unknown>();
+
+        if (query?.identifier) {
+            $and.push({
+                identifier: {
+                    $regex: query.identifier,
+                    $options: 'i'
                 }
             });
-            if ((query.regex as string).length > 3) {
-                const supplier = (query.regex as string).slice(3, 6);
-                pipeline.push({
-                    $match: {
-                        'supplier.identifier': {
-                            $regex: `^${supplier}`,
-                            $options: 'i'
-                        }
-                    }
-                });
-            }
+        }
+
+        if (query?.name) {
+            $and.push({
+                name: {
+                    $regex: query.name,
+                    $options: 'i'
+                }
+            });
+        }
+
+        if ($and.length > 0) {
+            pipeline.push({
+                $match: {
+                    $and
+                }
+            });
         }
 
         LineModel.aggregate(pipeline.concat({
             $facet: {
                 data: [{
-                    $project: {
-                        identifier: {
-                            $concat: ['$identifier', '$supplier.identifier']
-                        },
-                        name: 1
-                    }
-                }, {
                     $sort: {
                         identifier: 1
                     }

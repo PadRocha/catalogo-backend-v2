@@ -62,59 +62,44 @@ export async function listKey({ user, query }: Request, res: Response) {
             $unwind: {
                 path: '$line.supplier'
             }
+        }, {
+            $project: {
+                code: {
+                    $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
+                },
+                desc: 1,
+                image: 1
+            }
         });
 
-        if (query?.regex) {
-            const request = Array.isArray(query.regex) ? query.regex : new Array(query.regex);
-            const $or = new Array<unknown>();
-            request.forEach((value: any) => {
-                const $and = new Array<unknown>();
-                if ((value as string)?.length < 11) {
-                    const line = (value as string).slice(0, 3);
-                    $and.push({
-                        'line.identifier': {
-                            $regex: `^${line}`,
-                            $options: 'i'
-                        }
-                    });
+        const $and = new Array<unknown>();
 
-                    if ((value as string).length > 3) {
-                        const supplier = (value as string).slice(3, 6);
-                        $and.push({
-                            'line.supplier.identifier': {
-                                $regex: `^${supplier}`,
-                                $options: 'i'
-                            }
-                        });
-                    }
-                    if ((value as string).length > 6) {
-                        const code = (value as string).slice(6, 10);
-                        $and.push({
-                            code: {
-                                $regex: `^${code}`,
-                                $options: 'i'
-                            }
-                        });
-                    }
+        if (query?.code) {
+            $and.push({
+                code: {
+                    $regex: query.code,
+                    $options: 'i'
                 }
-
-                $or.push({ $and });
             });
-
-            pipeline.push({
-                $match: {
-                    $or
-                }
-            })
         }
 
         if (query?.desc) {
+            $and.push({
+                desc: {
+                    $regex: query.desc,
+                    $options: 'i'
+                }
+            });
+        }
+
+        if (query?.status) {
+            $and.push({ 'image.status': +query.status });
+        }
+
+        if ($and.length > 0) {
             pipeline.push({
                 $match: {
-                    desc: {
-                        $regex: query.desc,
-                        $options: 'i'
-                    }
+                    $and
                 }
             });
         }
@@ -122,14 +107,6 @@ export async function listKey({ user, query }: Request, res: Response) {
         KeyModel.aggregate(pipeline.concat({
             $facet: {
                 data: [{
-                    $project: {
-                        code: {
-                            $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
-                        },
-                        desc: 1,
-                        image: 1
-                    }
-                }, {
                     $sort: {
                         code: 1
                     }
@@ -386,59 +363,44 @@ export async function keysInfo({ query }: Request, res: Response) {
         $unwind: {
             path: '$line.supplier'
         }
+    }, {
+        $project: {
+            code: {
+                $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
+            },
+            desc: 1,
+            image: 1
+        }
     });
 
-    if (query?.regex) {
-        const request = Array.isArray(query.regex) ? query.regex : new Array(query.regex);
-        const $or = new Array<unknown>();
-        request.forEach((value: any) => {
-            const $and = new Array<unknown>();
-            if ((value as string)?.length < 11) {
-                const line = (value as string).slice(0, 3);
-                $and.push({
-                    'line.identifier': {
-                        $regex: `^${line}`,
-                        $options: 'i'
-                    }
-                });
+    const $and = new Array<unknown>();
 
-                if ((value as string).length > 3) {
-                    const supplier = (value as string).slice(3, 6);
-                    $and.push({
-                        'line.supplier.identifier': {
-                            $regex: `^${supplier}`,
-                            $options: 'i'
-                        }
-                    });
-                }
-                if ((value as string).length > 6) {
-                    const code = (value as string).slice(6, 10);
-                    $and.push({
-                        code: {
-                            $regex: `^${code}`,
-                            $options: 'i'
-                        }
-                    });
-                }
-            }
-
-            $or.push({ $and });
-        });
-
-        pipeline.push({
-            $match: {
-                $or
+    if (query?.code) {
+        $and.push({
+            code: {
+                $regex: query.code,
+                $options: 'i'
             }
         });
     }
 
     if (query?.desc) {
+        $and.push({
+            desc: {
+                $regex: query.desc,
+                $options: 'i'
+            }
+        });
+    }
+
+    if (query?.status) {
+        $and.push({ 'image.status': +query.status });
+    }
+
+    if ($and.length > 0) {
         pipeline.push({
             $match: {
-                desc: {
-                    $regex: query.desc,
-                    $options: 'i'
-                }
+                $and
             }
         });
     }
@@ -494,65 +456,12 @@ export async function keysInfo({ query }: Request, res: Response) {
         }
     }, {
         $project: {
-            status: 1,
-            success: {
-                $cond: {
-                    if: {
-                        $eq: ['$success', []]
-                    },
-                    then: [{
-                        count: 0
-                    }],
-                    else: '$status'
-                }
-            },
-            total: {
-                $cond: {
-                    if: {
-                        $eq: ['$total', []]
-                    },
-                    then: [{
-                        count: 0
-                    }],
-                    else: '$total'
-                }
-            }
-        }
-    }, {
-        $unwind: {
-            path: '$success'
-        }
-    }, {
-        $unwind: {
-            path: '$total'
-        }
-    }, {
-        $project: {
             status: {
                 $cond: {
                     if: {
                         $eq: ['$status', []]
                     },
-                    then: {
-                        defective: {
-                            $literal: 0
-                        },
-                        found: {
-                            $literal: 0
-                        },
-                        photographed: {
-                            $literal: 0
-                        },
-                        prepared: {
-                            $literal: 0
-                        },
-                        edited: {
-                            $literal: 0
-                        },
-                        saved: {
-                            $literal: 0
-                        },
-                    },
+                    then: {},
                     else: {
                         $arrayToObject: {
                             $map: {
@@ -602,6 +511,59 @@ export async function keysInfo({ query }: Request, res: Response) {
                     }
                 }
             },
+            success: {
+                $cond: {
+                    if: {
+                        $eq: ['$success', []]
+                    },
+                    then: [{
+                        count: 0
+                    }],
+                    else: '$success'
+                }
+            },
+            total: {
+                $cond: {
+                    if: {
+                        $eq: ['$total', []]
+                    },
+                    then: [{
+                        count: 0
+                    }],
+                    else: '$total'
+                }
+            }
+        }
+    }, {
+        $unwind: {
+            'path': '$success'
+        }
+    }, {
+        $unwind: {
+            'path': '$total'
+        }
+    }, {
+        $project: {
+            status: {
+                defective: {
+                    $ifNull: ['$statusdefective', 0]
+                },
+                found: {
+                    $ifNull: ['$status.found', 0]
+                },
+                photographed: {
+                    $ifNull: ['$status.photographed', 0]
+                },
+                prepared: {
+                    $ifNull: ['$status.prepared', 0]
+                },
+                edited: {
+                    $ifNull: ['$status.edited', 0]
+                },
+                saved: {
+                    $ifNull: ['$status.saved', 0]
+                }
+            },
             total: '$total.count',
             success: '$success.count'
         }
@@ -609,20 +571,7 @@ export async function keysInfo({ query }: Request, res: Response) {
         if (err)
             return res.status(409).send({ message: 'Internal error, probably error with params' });
 
-        return res.status(200).send({
-            data: {
-                status: {
-                    defective: data?.status?.defective ?? 0,
-                    found: data?.status?.found ?? 0,
-                    photographed: data?.status?.photographed ?? 0,
-                    prepared: data?.status?.prepared ?? 0,
-                    edited: data?.status?.edited ?? 0,
-                    saved: data?.status?.saved ?? 0,
-                },
-                total: data?.total ?? 0,
-                success: data?.success ?? 0
-            }
-        });
+        return res.status(200).send({ data });
 
     });
 }
