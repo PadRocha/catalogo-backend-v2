@@ -34,8 +34,8 @@ supplierSchema.statics.findByIdentifier = function (identifier: string) {
         }, {
             $limit: 1
         }
-    ]).then((supplier: LeanDocument<ISupplier>[]) => {
-        return supplier?.pop() ?? null;
+    ]).then(([supplier]: LeanDocument<ISupplier>[]) => {
+        return supplier ?? null;
     });
 }
 

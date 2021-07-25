@@ -340,7 +340,10 @@ export async function resetKey({ user, query, body }: Request, res: Response) {
     }
 }
 
-export async function keysInfo({ query }: Request, res: Response) {
+export async function keysInfo({ user, query }: Request, res: Response) {
+    if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
+
     const pipeline = new Array<unknown>({
         $lookup: {
             from: 'lines',
@@ -548,8 +551,10 @@ export async function keysInfo({ query }: Request, res: Response) {
     });
 }
 
-export function nextLast({ params }: Request, res: Response) {
-    if (!params?.code)
+export function nextLast({ user, params }: Request, res: Response) {
+    if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
+        return res.status(423).send({ message: 'Access denied' });
+    if (params?.code.length > 11)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     KeyModel.aggregate([{
@@ -588,9 +593,15 @@ export function nextLast({ params }: Request, res: Response) {
         }
     }, {
         $match: {
-            code: {
-                $gt: params.code
-            }
+            $and: [{
+                code: {
+                    $regex: `^${params.code.slice(0, 6)}`
+                }
+            }, {
+                code: {
+                    $gt: params.code
+                }
+            }]
         }
     }, {
         $limit: 1

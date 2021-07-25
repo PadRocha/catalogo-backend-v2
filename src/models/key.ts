@@ -1,7 +1,5 @@
-import { Document, Types, Model, model, Schema } from 'mongoose';
-import { countDocs, ICountDocs } from '../services/countDocs';
+import { Document, Types, Model, model, Schema, CallbackError } from 'mongoose';
 import { findAndDeleteMany, IFindAndDeleteMany } from '../services/findAndDeleteMany';
-import { paginate, IPaginate } from '../services/paginate';
 import { IImage } from './image';
 import { LineModel } from './line';
 
@@ -31,7 +29,7 @@ export interface keyInfo {
     readonly success?: number;
 }
 
-export interface IKeyModel extends Model<IKey>, IPaginate, ICountDocs, IFindAndDeleteMany<IKey> {
+export interface IKeyModel extends Model<IKey>, IFindAndDeleteMany<IKey> {
     totalSuccess(pipeline: unknown[]): Promise<number>;
     countStatus(pipeline: unknown[], status: 0 | 1 | 2 | 3 | 4 | 5): Promise<number>;
 }
@@ -106,17 +104,16 @@ keySchema.index({ _id: 1, 'image.idN': 1 }, { unique: true });
 
 /*------------------------------------------------------------------*/
 
-keySchema.pre<IKey>('save', function (next: Function) {
-    for (let i = 0; i < (4 - this.code.length); i++)
+keySchema.pre<IKey>('save', function (next: (err?: CallbackError) => void) {
+    const interaction = (4 - this.code.toString().length);
+    for (let i = 0; i < interaction; i++) {
         this.code = '0' + this.code;
+    }
+
     return next();
 });
 
 keySchema.statics.findAndDeleteMany = findAndDeleteMany;
-
-keySchema.statics.countDocs = countDocs;
-
-keySchema.statics.paginate = paginate;
 
 keySchema.statics.totalSuccess = function (pipeline: unknown[]) {
     return this.aggregate(pipeline.concat({
