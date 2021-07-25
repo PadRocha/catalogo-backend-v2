@@ -522,7 +522,7 @@ export async function keysInfo({ user, query }: Request, res: Response) {
         $project: {
             status: {
                 defective: {
-                    $ifNull: ['$statusdefective', 0]
+                    $ifNull: ['$status.defective', 0]
                 },
                 found: {
                     $ifNull: ['$status.found', 0]
@@ -554,7 +554,7 @@ export async function keysInfo({ user, query }: Request, res: Response) {
 export function nextLast({ user, params }: Request, res: Response) {
     if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
         return res.status(423).send({ message: 'Access denied' });
-    if (params?.code.length > 11)
+    if (params?.code.length !== 10)
         return res.status(400).send({ message: 'Client has not sent params' });
 
     KeyModel.aggregate([{
