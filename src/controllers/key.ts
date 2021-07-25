@@ -375,35 +375,31 @@ export async function keysInfo({ query }: Request, res: Response) {
 
     const $and = new Array<unknown>();
 
-    if (query?.code) {
+    if (query?.code)
         $and.push({
             code: {
                 $regex: query.code,
                 $options: 'i'
             }
         });
-    }
 
-    if (query?.desc) {
+    if (query?.desc)
         $and.push({
             desc: {
                 $regex: query.desc,
                 $options: 'i'
             }
         });
-    }
 
-    if (query?.status) {
+    if (query?.status && !isNaN(+query.status) && +query.status >= 0 && +query.status < 6)
         $and.push({ 'image.status': +query.status });
-    }
 
-    if ($and.length > 0) {
+    if ($and.length > 0)
         pipeline.push({
             $match: {
                 $and
             }
         });
-    }
 
     KeyModel.aggregate(pipeline.concat({
         $facet: {
@@ -438,14 +434,6 @@ export async function keysInfo({ query }: Request, res: Response) {
                     }
                 }
             }, {
-                $group: {
-                    _id: null,
-                    count: {
-                        $sum: 1
-                    }
-                }
-            }],
-            total: [{
                 $group: {
                     _id: null,
                     count: {
@@ -521,26 +509,11 @@ export async function keysInfo({ query }: Request, res: Response) {
                     }],
                     else: '$success'
                 }
-            },
-            total: {
-                $cond: {
-                    if: {
-                        $eq: ['$total', []]
-                    },
-                    then: [{
-                        count: 0
-                    }],
-                    else: '$total'
-                }
             }
         }
     }, {
         $unwind: {
             'path': '$success'
-        }
-    }, {
-        $unwind: {
-            'path': '$total'
         }
     }, {
         $project: {
@@ -564,7 +537,6 @@ export async function keysInfo({ query }: Request, res: Response) {
                     $ifNull: ['$status.saved', 0]
                 }
             },
-            total: '$total.count',
             success: '$success.count'
         }
     })).exec((err, [data]: keyInfo[]) => {
@@ -573,5 +545,60 @@ export async function keysInfo({ query }: Request, res: Response) {
 
         return res.status(200).send({ data });
 
+    });
+}
+
+export function nextLast({ params }: Request, res: Response) {
+    if (!params?.code)
+        return res.status(400).send({ message: 'Client has not sent params' });
+
+    KeyModel.aggregate([{
+        $lookup: {
+            from: 'lines',
+            localField: 'line',
+            foreignField: '_id',
+            as: 'line'
+        }
+    }, {
+        $unwind: {
+            path: '$line'
+        }
+    }, {
+        $lookup: {
+            from: 'suppliers',
+            localField: 'line.supplier',
+            foreignField: '_id',
+            as: 'line.supplier'
+        }
+    }, {
+        $unwind: {
+            path: '$line.supplier'
+        }
+    }, {
+        $project: {
+            code: {
+                $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
+            },
+            desc: 1,
+            image: 1
+        }
+    }, {
+        $sort: {
+            code: 1
+        }
+    }, {
+        $match: {
+            code: {
+                $gt: params.code
+            }
+        }
+    }, {
+        $limit: 1
+    }]).exec((err, [data]: LeanDocument<IKey>[]) => {
+        if (err)
+            return res.status(409).send({ message: 'Internal error, probably error with params' });
+        if (!data)
+            return res.status(404).send({ message: 'Document not found' });
+        return res.status(200).send({ data });
     });
 }

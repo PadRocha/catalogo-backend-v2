@@ -28,7 +28,6 @@ export interface keyInfo {
         readonly edited?: number;
         readonly saved?: number;
     };
-    readonly total?: number;
     readonly success?: number;
 }
 

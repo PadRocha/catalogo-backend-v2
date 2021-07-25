@@ -69,6 +69,9 @@ router.route('/key/reset')
 router.route('/key/info')
     .get(authorized, keyController.keysInfo);
 
+router.route('/key/:code/next')
+    .get(authorized, keyController.nextLast)
+
 router.route('/status/:key/:idN')
     .put(authorized, statusController.updateStatus);
 

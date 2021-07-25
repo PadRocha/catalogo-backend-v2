@@ -56,31 +56,28 @@ export function listLine({ user, query }: Request, res: Response) {
 
         const $and = new Array<unknown>();
 
-        if (query?.identifier) {
+        if (query?.identifier)
             $and.push({
                 identifier: {
                     $regex: query.identifier,
                     $options: 'i'
                 }
             });
-        }
 
-        if (query?.name) {
+        if (query?.name)
             $and.push({
                 name: {
                     $regex: query.name,
                     $options: 'i'
                 }
             });
-        }
 
-        if ($and.length > 0) {
+        if ($and.length > 0)
             pipeline.push({
                 $match: {
                     $and
                 }
             });
-        }
 
         LineModel.aggregate(pipeline.concat({
             $facet: {
