@@ -1,6 +1,5 @@
 import { Document, Types, LeanDocument, Model, model, Schema } from 'mongoose';
 import { findAndDeleteMany, IFindAndDeleteMany } from '../services/findAndDeleteMany';
-import { paginate, IPaginate } from '../services/paginate';
 import { KeyModel } from './key';
 import { SupplierModel } from './supplier';
 
@@ -13,7 +12,7 @@ export interface ILine extends Document {
     countKeys: number;
 };
 
-export interface ILineModel extends Model<ILine>, IPaginate, IFindAndDeleteMany<ILine> {
+export interface ILineModel extends Model<ILine>, IFindAndDeleteMany<ILine> {
     totalKey(id: string): Promise<number>;
     findByIdentifier(identifier: string): Promise<LeanDocument<ILine> | null>;
 }
@@ -56,8 +55,6 @@ lineSchema.index({ identifier: 1, supplier: 1 }, { unique: true });
 /*------------------------------------------------------------------*/
 
 lineSchema.statics.findAndDeleteMany = findAndDeleteMany;
-
-lineSchema.statics.paginate = paginate;
 
 lineSchema.statics.totalKey = async function (_id: string): Promise<number> {
     return await KeyModel

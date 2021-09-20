@@ -11,7 +11,7 @@ export const config = {
     },
     MONGO: {
         URI: process.env.MONGO_URI || 'mongodb://localhost/database',
-        USER: process.env.MONGO_USER,
+        USER: process.env.MONGOuser,
         PASSWORD: process.env.MONGO_PASSWORD,
     },
     AUTH: {
@@ -28,7 +28,7 @@ export const config = {
         SECRET: process.env.CLOUDINARY_SECRET,
     },
     LIMIT: {
-        KEY: 20,
+        KEY: 18,
         LINE: 16
     }
 } as const;

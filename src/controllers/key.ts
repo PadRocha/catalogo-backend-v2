@@ -230,7 +230,15 @@ export async function updateKey({ user, body, query }: Request, res: Response) {
         return res.status(400).send({ message: 'Client has not sent params' });
     });
 
-    KeyModel.findOneAndUpdate({ _id: query.id }, body)
+    KeyModel.findOneAndUpdate({ _id: query.id }, body, { new: true })
+        .populate({
+            path: 'line',
+            select: 'identifier',
+            populate: {
+                path: 'supplier',
+                select: 'identifier',
+            }
+        })
         .exec((err, data) => {
             if (err)
                 return res.status(409).send({ message: 'Internal error, probably error with params' });
@@ -340,7 +348,7 @@ export async function resetKey({ user, query, body }: Request, res: Response) {
     }
 }
 
-export async function keysInfo({ user, query }: Request, res: Response) {
+export function keysInfo({ user, query }: Request, res: Response) {
     if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
         return res.status(423).send({ message: 'Access denied' });
 
