@@ -1,77 +1,207 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
-import { KeyModel } from "../models/key";
+import { isValidObjectId, LeanDocument, Types } from 'mongoose';
+import { IKey, KeyModel } from "../models/key";
 
-export function updateStatus({ user, params, body }: Request, res: Response) {
-    if (!user?.roleIncludes(['EDIT', 'GRANT', 'ADMIN']))
-        return res.status(423).send({ message: 'Access denied' });
+export function updateStatus(
+    {
+        user,
+        params: { id: _id, idN },
+        body: { status }
+    }: Omit<Request, 'body'> & {
+        params: {
+            id: string;
+            idN: string;
+        };
+        body: {
+            status?: number;
+        };
+    },
+    res: Response
+) {
+    if (!user?.roleIncludes('EDIT', 'GRANT', 'ADMIN'))
+        return res.status(423).send({
+            message: 'Access denied'
+        });
 
-    const idN = Number(params.idN);
-    if (!Types.ObjectId.isValid(params?.key) || idN < 0 || idN > 2)
-        return res.status(400).send({ message: 'Client has not sent params' });
+    if (!isValidObjectId(_id) || !idN || !/[0-2]/.test(idN))
+        return res.status(400).send({
+            message: 'Client has not sent params'
+        });
 
-    if (!isNaN(body?.status)) {
-        if (body.status < 0 || body.status > 5)
-            return res.status(400).send({ message: 'Client has not sent params' });
-
-        KeyModel.findOneAndUpdate({
-            _id: params.key,
-            'image.idN': idN
-        }, {
-            $set: {
-                'image.$.status': body.status
-            }
-        }, {
-            new: true
-        }).exec((err, data) => {
+    if (!!status && !isNaN(status)) {
+        if (status < 0 || status > 5)
+            return res.status(400).send({
+                message: 'Client has not sent params'
+            });
+        KeyModel.updateOne(
+            {
+                _id,
+                'image.idN': Number(idN)
+            },
+            { $set: { 'image.$.status': status } }
+        ).exec((err, { modifiedCount }) => {
             if (err)
-                return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (data)
-                return res.status(200).send({ data });
-            else
-                KeyModel.findOneAndUpdate({
-                    _id: params.key,
-                    'image.idN': {
-                        $ne: idN
-                    }
-                }, {
-                    $push: {
-                        image: {
-                            idN,
-                            status: body.status
+                return res.status(409).send({
+                    message: 'Internal error, probably error with params'
+                });
+            if (modifiedCount !== 1) {
+                KeyModel.updateOne(
+                    {
+                        _id,
+                        'image.idN': {
+                            $ne: Number(idN)
+                        }
+                    },
+                    {
+                        $push: {
+                            image: {
+                                idN: Number(idN),
+                                status,
+                            }
                         }
                     }
-                }, {
-                    new: true
-                }).exec(function (err, data) {
-                    if (err)
-                        return res.status(409).send({ message: 'Internal error, probably error with params' });
-                    if (!data)
-                        return res.status(404).send({ message: 'Document not found' });
-                    return res.status(200).send({ data });
+                ).exec((err, { modifiedCount }) => {
+                    if (err || modifiedCount !== 1)
+                        return res.status(409).send({
+                            message: 'Internal error, probably error with params'
+                        });
+                    KeyModel.aggregate<LeanDocument<IKey>>()
+                        .match({ _id: new Types.ObjectId(_id) })
+                        .lookup({
+                            from: 'lines',
+                            localField: 'line',
+                            foreignField: '_id',
+                            as: 'line'
+                        })
+                        .unwind('$line')
+                        .lookup({
+                            from: 'suppliers',
+                            localField: 'line.supplier',
+                            foreignField: '_id',
+                            as: 'line.supplier'
+                        })
+                        .unwind('$line.supplier')
+                        .project({
+                            code: {
+                                $concat: [
+                                    '$line.identifier',
+                                    '$line.supplier.identifier',
+                                    '$code'
+                                ]
+                            },
+                            desc: 1,
+                            image: 1
+                        })
+                        .exec((err, [data]) => {
+                            if (err)
+                                return res.status(409).send({
+                                    message: 'Internal error, probably error with params'
+                                });
+                            if (!data)
+                                return res.status(404).send({
+                                    message: 'Document not found'
+                                });
+                            return res.status(200).send({ data });
+                        });
                 });
+            } else {
+                KeyModel.aggregate<LeanDocument<IKey>>()
+                    .match({ _id: new Types.ObjectId(_id) })
+                    .lookup({
+                        from: 'lines',
+                        localField: 'line',
+                        foreignField: '_id',
+                        as: 'line'
+                    })
+                    .unwind('$line')
+                    .lookup({
+                        from: 'suppliers',
+                        localField: 'line.supplier',
+                        foreignField: '_id',
+                        as: 'line.supplier'
+                    })
+                    .unwind('$line.supplier')
+                    .project({
+                        code: {
+                            $concat: [
+                                '$line.identifier',
+                                '$line.supplier.identifier',
+                                '$code'
+                            ]
+                        },
+                        desc: 1,
+                        image: 1
+                    })
+                    .exec((err, [data]) => {
+                        if (err)
+                            return res.status(409).send({
+                                message: 'Internal error, probably error with params'
+                            });
+                        if (!data)
+                            return res.status(404).send({
+                                message: 'Document not found'
+                            });
+                        return res.status(200).send({ data });
+                    });
+            }
         });
     } else {
-        KeyModel.findOneAndUpdate({
-            _id: params.key
-        }, {
-            $pull: {
-                image: {
-                    idN,
-                    status: {
-                        $gte: 0,
-                        $lte: 4
+        KeyModel.updateOne(
+            { _id },
+            {
+                $pull: {
+                    image: {
+                        idN: Number(idN),
+                        status: {
+                            $gte: 0,
+                            $lte: 4
+                        }
                     }
                 }
             }
-        }, {
-            new: true
-        }).exec(async (err, data) => {
-            if (err)
-                return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data)
-                return res.status(404).send({ message: 'Document not found' });
-            return res.status(200).send({ data });
+        ).exec((err, { modifiedCount }) => {
+            if (err || modifiedCount !== 1)
+                return res.status(409).send({
+                    message: 'Internal error, probably error with params'
+                });
+            KeyModel.aggregate<LeanDocument<IKey>>()
+                .match({ _id: new Types.ObjectId(_id) })
+                .lookup({
+                    from: 'lines',
+                    localField: 'line',
+                    foreignField: '_id',
+                    as: 'line'
+                })
+                .unwind('$line')
+                .lookup({
+                    from: 'suppliers',
+                    localField: 'line.supplier',
+                    foreignField: '_id',
+                    as: 'line.supplier'
+                })
+                .unwind('$line.supplier')
+                .project({
+                    code: {
+                        $concat: [
+                            '$line.identifier',
+                            '$line.supplier.identifier',
+                            '$code'
+                        ]
+                    },
+                    desc: 1,
+                    image: 1
+                })
+                .exec((err, [data]) => {
+                    if (err)
+                        return res.status(409).send({
+                            message: 'Internal error, probably error with params'
+                        });
+                    if (!data)
+                        return res.status(404).send({
+                            message: 'Document not found'
+                        });
+                    return res.status(200).send({ data });
+                });
         });
     }
 }

@@ -1,37 +1,36 @@
 import { Document } from "mongoose";
-import { config } from "../config/config";
+import { config } from "../config";
 
-type authRole = 'READ' | 'WRITE' | 'EDIT' | 'GRANT' | 'ADMIN';
+type authRole = keyof typeof config.AUTH;
 
 export interface IRoles extends Document {
-    roleIncludes(roles: authRole | authRole[]): boolean;
+    roleIncludes(...roles: authRole[]): boolean;
 }
 
 const configAuth: { [AUTH: string]: number } = config.AUTH;
 
-export function intoRoles(role: number): string[] {
+export function intoRoles(role?: number): string[] {
+    if (!role)
+        return new Array<string>();
     return Object.keys(configAuth).filter(auths => !!(role & configAuth[auths]));
 }
 
-export function intoRole(roles: string[]): number {
+export function intoRole(roles: authRole[]): number {
     return roles.reduce((accumulator, role) => accumulator |= configAuth[role], 0);
 }
 
-export function hasValidRoles(roles: string | string[]): boolean {
-    if (Array.isArray(roles) && !!roles?.length)
+export function hasValidRoles(roles?: authRole | authRole[]): boolean {
+    if (Array.isArray(roles) && roles.length > 0)
         return roles.every(r => Object.keys(configAuth).includes(r));
-    else if (!Array.isArray(roles) && !!roles?.trim())
+    else if (roles instanceof String && typeof roles === 'string' && !!roles.trim())
         return Object.keys(configAuth).includes(roles);
     else
         return false;
-
 }
 
-export function roleIncludes(this: any, roles: string | string[]): boolean {
+export function roleIncludes(this: any, ...roles: authRole[]): boolean {
     if (!hasValidRoles(roles))
-        return false
+        return false;
 
-    return Array.isArray(roles)
-        ? roles.some(r => !!(this.role & configAuth[r]))
-        : !!(this.role & configAuth[roles]);
+    return roles.some(r => !!(this.role & configAuth[r]));
 }

@@ -1,460 +1,743 @@
 import { Request, Response } from 'express';
-import { Types, LeanDocument } from 'mongoose';
-import { v2 } from 'cloudinary';
-import { config } from '../config/config';
-import { IImageFile, IKey, keyInfo, KeyModel } from '../models/key';
+import { existsSync, unlinkSync } from 'fs';
+import { isValidObjectId, LeanDocument, Types } from 'mongoose';
+import { resolve } from 'path';
+import { config } from '../config';
+import { IKey, KeyModel } from '../models/key';
 import { LineModel } from '../models/line';
 
-v2.config({
-    cloud_name: config.CLOUDINARY.NAME,
-    api_key: config.CLOUDINARY.KEY,
-    api_secret: config.CLOUDINARY.SECRET,
-});
-
-export async function saveKey({ user, body }: Request, res: Response) {
-    if (!user?.roleIncludes(['GRANT', 'ADMIN']))
-        return res.status(423).send({ message: 'Access denied' });
+export async function saveKey(
+    { user, body }: Omit<Request, 'body'> & {
+        body: LeanDocument<IKey> & {
+            status?: number;
+        };
+    },
+    res: Response
+) {
+    if (!user?.roleIncludes('GRANT', 'ADMIN'))
+        return res.status(423).send({
+            message: 'Access denied'
+        });
     if (!body?.line)
-        return res.status(400).send({ message: 'Client has not sent params' });
-
-    body.line = await LineModel.findByIdentifier(body.line).catch(() => {
-        return res.status(400).send({ message: 'Client has not sent params' });
+        return res.status(400).send({
+            message: 'Client has not sent params'
+        });
+    const newKey = new KeyModel({
+        ...body,
+        line: await LineModel.findByIdentifier(body.line),
+        ...(
+            (
+                !!body?.status &&
+                !isNaN(body.status) &&
+                body.status >= 0 &&
+                body.status < 5
+            ) &&
+            {
+                image: new Array(3)
+                    .fill({ status: body.status })
+                    .map(({ status }, idN) => {
+                        return { idN, status };
+                    })
+            }
+        )
     });
-
-    const newKey = new KeyModel(body);
-    if (!isNaN(body?.status) && body.status >= 0 && body.status < 5) {
-        for (let idN = 0; idN < 3; idN++)
-            newKey.image.push(<IImageFile>{ idN, status: body.status });
-    }
-
     newKey.save((err, data) => {
         if (err)
-            return res.status(409).send({ message: 'Internal error, probably error with params' });
-        if (!data) return res.status(204).send({ message: 'Saved and is not returning any content' });
+            return res.status(409).send({
+                message: 'Internal error, probably error with params'
+            });
+        if (!data)
+            return res.status(204).send({
+                message: 'Saved and is not returning any content'
+            });
         return res.status(200).send({ data });
     });
 }
 
-export async function listKey({ user, query }: Request, res: Response) {
-    if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
-        return res.status(423).send({ message: 'Access denied' });
-    if (query?.page) {
-        const page = !isNaN(Number(query.page)) ? Number(query.page) : 1;
-        const pipeline = new Array<unknown>({
-            $lookup: {
+
+
+export function listKey(
+    {
+        user,
+        query: { page, code, desc, status, id: _id }
+    }: Request & {
+        query: {
+            page?: string | number;
+            code?: string;
+            desc?: string;
+            status?: string | number;
+            id?: string;
+        }
+    },
+    res: Response
+) {
+    if (!user?.roleIncludes('READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN'))
+        return res.status(423).send({
+            message: 'Access denied'
+        });
+    if (!!page) {
+        page = !isNaN(Number(page)) ? Number(page) : 1;
+        status = Number(status);
+        type response = {
+            data: LeanDocument<IKey>[];
+            totalDocs: number;
+        };
+        KeyModel.aggregate<response>()
+            .lookup({
                 from: 'lines',
                 localField: 'line',
                 foreignField: '_id',
                 as: 'line'
-            }
-        }, {
-            $unwind: {
-                path: '$line'
-            }
-        }, {
-            $lookup: {
+            })
+            .unwind('$line')
+            .lookup({
                 from: 'suppliers',
                 localField: 'line.supplier',
                 foreignField: '_id',
                 as: 'line.supplier'
-            }
-        }, {
-            $unwind: {
-                path: '$line.supplier'
-            }
-        }, {
-            $project: {
+            })
+            .unwind('$line.supplier')
+            .project({
                 code: {
-                    $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
+                    $concat: [
+                        '$line.identifier',
+                        '$line.supplier.identifier',
+                        '$code'
+                    ]
                 },
                 desc: 1,
                 image: 1
-            }
-        });
-
-        const $and = new Array<unknown>();
-
-        if (query?.code) {
-            $and.push({
-                code: {
-                    $regex: query.code,
-                    $options: 'i'
-                }
-            });
-        }
-
-        if (query?.desc) {
-            $and.push({
-                desc: {
-                    $regex: query.desc,
-                    $options: 'i'
-                }
-            });
-        }
-
-        if (query?.status) {
-            $and.push({ 'image.status': +query.status });
-        }
-
-        if ($and.length > 0) {
-            pipeline.push({
-                $match: {
-                    $and
-                }
-            });
-        }
-
-        KeyModel.aggregate(pipeline.concat({
-            $facet: {
-                data: [{
-                    $sort: {
-                        code: 1
+            })
+            .match({
+                ...(
+                    (code || desc || !isNaN(status)) &&
+                    {
+                        $and: [
+                            ...code
+                                ? [
+                                    {
+                                        code: {
+                                            $regex: code,
+                                            $options: 'i',
+                                        }
+                                    }
+                                ]
+                                : [],
+                            ...desc
+                                ? [
+                                    {
+                                        desc: {
+                                            $regex: desc,
+                                            $options: 'i',
+                                        }
+                                    }
+                                ]
+                                : [],
+                            ...(status >= 0 && status <= 5)
+                                ? [
+                                    {
+                                        'image.status': status
+                                    }
+                                ]
+                                : [],
+                        ],
                     }
-                }, {
-                    $skip: config.LIMIT.KEY * (page - 1)
-                }, {
-                    $limit: config.LIMIT.KEY
-                }],
-                total: [{
+                ),
+            })
+            .facet({
+                data: [
+                    {
+                        $sort: {
+                            code: 1
+                        }
+                    },
+                    {
+                        $skip: config.LIMIT.KEY * (page - 1)
+                    },
+                    {
+                        $limit: config.LIMIT.KEY
+                    }
+                ],
+                total: [
+                    {
+                        $group: {
+                            _id: null,
+                            count: {
+                                $sum: 1
+                            }
+                        }
+                    }
+                ]
+            })
+            .project({
+                data: 1,
+                total: {
+                    $cond: {
+                        if: {
+                            $eq: ['$total', []]
+                        },
+                        then: 0,
+                        else: '$total.count'
+                    }
+                }
+            })
+            .unwind('$total')
+            .exec((err, [{ data, totalDocs }]) => {
+                if (err || typeof page !== 'number')
+                    return res.status(409).send({
+                        message: 'Internal error, probably error with params'
+                    });
+                if (data.length < 1)
+                    return res.status(404).send({
+                        message: 'Document not found'
+                    });
+
+                const totalPages = Math.ceil(totalDocs / config.LIMIT.KEY);
+                const hasNextPage = totalPages > page;
+                const hasPrevPage = page > 1;
+                return res.status(200).send({
+                    data,
+                    metadata: {
+                        totalDocs,
+                        limit: config.LIMIT.KEY,
+                        page,
+                        nextPage: hasNextPage ? page + 1 : null,
+                        prevPage: hasPrevPage ? page - 1 : null,
+                        hasNextPage,
+                        hasPrevPage,
+                        totalPages
+                    }
+                });
+            });
+
+    } else if (isValidObjectId(_id)) {
+        KeyModel.aggregate<LeanDocument<IKey>>()
+            .match({
+                _id: new Types.ObjectId(_id)
+            })
+            .lookup({
+                from: 'lines',
+                localField: 'line',
+                foreignField: '_id',
+                as: 'line'
+            })
+            .unwind('$line')
+            .lookup({
+                from: 'suppliers',
+                localField: 'line.supplier',
+                foreignField: '_id',
+                as: 'line.supplier'
+            })
+            .unwind('$line.supplier')
+            //TODO: Revisar si esta es la respuesta correcta
+
+            .project({
+                code: {
+                    $concat: [
+                        '$line.identifier',
+                        '$line.supplier.identifier',
+                        '$code'
+                    ]
+                },
+                desc: 1,
+                image: 1
+            })
+            .exec(async (err, [data]) => {
+                if (err)
+                    return res.status(409).send({
+                        message: 'Internal error, probably error with params'
+                    });
+                if (!data)
+                    return res.status(404).send({
+                        message: 'Document not found'
+                    });
+                return res.status(200).send({ data });
+            });
+    } else {
+        KeyModel.aggregate<LeanDocument<IKey>>()
+            .lookup({
+                from: 'lines',
+                localField: 'line',
+                foreignField: '_id',
+                as: 'line'
+            })
+            .unwind('$line')
+            .lookup({
+                from: 'suppliers',
+                localField: 'line.supplier',
+                foreignField: '_id',
+                as: 'line.supplier'
+            })
+            .unwind('$line.supplier')
+            //TODO: Revisar si esta es la respuesta correcta
+
+            .project({
+                code: {
+                    $concat: [
+                        '$line.identifier',
+                        '$line.supplier.identifier',
+                        '$code'
+                    ]
+                },
+                desc: 1,
+                image: 1
+            })
+            .exec((err, data) => {
+                if (err)
+                    return res.status(409).send({
+                        message: 'Internal error, probably error with params'
+                    });
+                if (data.length < 1)
+                    return res.status(404).send({
+                        message: 'Document not found'
+                    });
+                return res.status(200).send({ data });
+            });
+    }
+}
+
+export async function updateKey(
+    {
+        user,
+        query: { id: _id },
+        body,
+    }: Omit<Request, 'body'> & {
+        query: {
+            id?: string;
+        };
+        body?: LeanDocument<IKey>;
+    },
+    res: Response
+) {
+    if (!user?.roleIncludes('EDIT', 'GRANT', 'ADMIN'))
+        return res.status(423).send({
+            message: 'Access denied'
+        });
+    if (!isValidObjectId(_id) || !body?.line)
+        return res.status(400).send({
+            message: 'Client has not sent params'
+        });
+    KeyModel.updateOne(
+        { _id },
+        {
+            ...body,
+            line: LineModel.findByIdentifier(body.line),
+        }
+    ).exec((err, { modifiedCount }) => {
+        if (err || modifiedCount !== 1)
+            return res.status(409).send({
+                message: 'Internal error, probably error with params'
+            });
+        KeyModel.aggregate<LeanDocument<IKey>>()
+            .match({ _id: new Types.ObjectId(_id) })
+            .lookup({
+                from: 'lines',
+                localField: 'line',
+                foreignField: '_id',
+                as: 'line'
+            })
+            .unwind('$line')
+            .lookup({
+                from: 'suppliers',
+                localField: 'line.supplier',
+                foreignField: '_id',
+                as: 'line.supplier'
+            })
+            .unwind('$line.supplier')
+            .project({
+                code: {
+                    $concat: [
+                        '$line.identifier',
+                        '$line.supplier.identifier',
+                        '$code'
+                    ]
+                },
+                desc: 1,
+                image: 1
+            })
+            .exec((err, [data]) => {
+                if (err)
+                    return res.status(409).send({
+                        message: 'Internal error, probably error with params'
+                    });
+                if (!data)
+                    return res.status(404).send({
+                        message: 'Document not found'
+                    });
+                return res.status(200).send({ data });
+            });
+    });
+}
+
+export function deleteKey(
+    {
+        user,
+        query: { id: _id },
+    }: Request & {
+        query: {
+            id?: string;
+        };
+    },
+    res: Response
+) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({
+            message: 'Access denied'
+        });
+    if (!isValidObjectId(_id))
+        return res.status(400).send({
+            message: 'Client has not sent params'
+        });
+    KeyModel.aggregate<LeanDocument<IKey>>()
+        .match({ _id: new Types.ObjectId(_id) })
+        .lookup({
+            from: 'lines',
+            localField: 'line',
+            foreignField: '_id',
+            as: 'line'
+        })
+        .unwind('$line')
+        .lookup({
+            from: 'suppliers',
+            localField: 'line.supplier',
+            foreignField: '_id',
+            as: 'line.supplier'
+        })
+        .unwind('$line.supplier')
+        .project({
+            line: {
+                $concat: [
+                    '$line.identifier',
+                    '$line.supplier.identifier',
+                ]
+            },
+            code: 1,
+            image: 1,
+        })
+        .exec((err, [data]) => {
+            if (err)
+                return res.status(409).send({
+                    message: 'Internal error, probably error with params'
+                });
+            if (!data)
+                return res.status(404).send({
+                    message: 'Document not found'
+                });
+            KeyModel.deleteOne({ _id })
+                .exec((err, { deletedCount }) => {
+                    if (err || deletedCount !== 1)
+                        return res.status(409).send({
+                            message: 'Internal error, probably error with params'
+                        });
+                    for (const { idN, status } of data.image) {
+                        if (status !== 5)
+                            continue;
+                        const image = data.code + ' ' + idN + '.jpg';
+                        const file = resolve(
+                            __dirname,
+                            "../../public",
+                            data.line.trim(),
+                            image,
+                        );
+                        if (!existsSync(file))
+                            continue;
+                        unlinkSync(file);
+                    }
+                    return res.status(200).send({ data });
+                });
+        });
+}
+
+export async function resetKey(
+    {
+        user,
+        query: { id: _id },
+        body: { status },
+    }: Omit<Request, 'body'> & {
+        query: {
+            id?: string;
+        };
+        body: {
+            status?: number;
+        };
+    },
+    res: Response
+) {
+    if (!user?.roleIncludes('ADMIN'))
+        return res.status(423).send({
+            message: 'Access denied'
+        });
+    const total = !!status && !isNaN(status) && status >= 0 && status < 5
+        ? 3
+        : 0;
+    const image = new Array(total)
+        .fill({ status })
+        .map(({ status }, idN) => {
+            return { idN, status };
+        });
+    if (isValidObjectId(_id)) {
+        KeyModel.aggregate<LeanDocument<IKey>>()
+            .match({ _id: new Types.ObjectId(_id) })
+            .lookup({
+                from: 'lines',
+                localField: 'line',
+                foreignField: '_id',
+                as: 'line'
+            })
+            .unwind('$line')
+            .lookup({
+                from: 'suppliers',
+                localField: 'line.supplier',
+                foreignField: '_id',
+                as: 'line.supplier'
+            })
+            .unwind('$line.supplier')
+            .project({
+                line: {
+                    $concat: [
+                        '$line.identifier',
+                        '$line.supplier.identifier',
+                    ]
+                },
+                code: 1,
+                image: 1,
+            })
+            .exec((err, [data]) => {
+                if (err)
+                    return res.status(409).send({
+                        message: 'Internal error, probably error with params'
+                    });
+                if (!data)
+                    return res.status(404).send({
+                        message: 'Document not found'
+                    });
+                KeyModel.updateOne(
+                    { _id },
+                    { $set: { image } }
+                ).exec((err, { modifiedCount }) => {
+                    if (err || modifiedCount === 0)
+                        return res.status(409).send({
+                            message: 'Internal error, probably error with params'
+                        });
+                    for (const { idN, status } of data.image) {
+                        if (status !== 5)
+                            continue;
+                        const image = data.code + ' ' + idN + '.jpg';
+                        const file = resolve(
+                            __dirname,
+                            "../../public",
+                            data.line.trim(),
+                            image,
+                        );
+                        if (!existsSync(file))
+                            continue;
+                        unlinkSync(file);
+                    }
+                    return res.status(200).send({ data });
+                });
+            });
+    } else {
+        KeyModel.aggregate<LeanDocument<IKey>>()
+            .match({ image: { $gt: [] } })
+            .lookup({
+                from: 'lines',
+                localField: 'line',
+                foreignField: '_id',
+                as: 'line'
+            })
+            .unwind('$line')
+            .lookup({
+                from: 'suppliers',
+                localField: 'line.supplier',
+                foreignField: '_id',
+                as: 'line.supplier'
+            })
+            .unwind('$line.supplier')
+            .project({
+                line: {
+                    $concat: [
+                        '$line.identifier',
+                        '$line.supplier.identifier',
+                    ]
+                },
+                code: 1,
+                image: 1,
+            })
+            .exec((err, data) => {
+                if (err)
+                    return res.status(409).send({
+                        message: 'Internal error, probably error with params'
+                    });
+                if (data.length < 1)
+                    return res.status(404).send({
+                        message: 'Document not found'
+                    });
+                KeyModel.updateMany(
+                    { image: { $gt: [] } },
+                    { $set: { image } }
+                ).exec((err, { modifiedCount }) => {
+                    if (err || modifiedCount === 0)
+                        return res.status(409).send({
+                            message: 'Internal error, probably error with params'
+                        });
+                    for (const { line, code, image } of data) {
+                        for (const { idN, status } of image) {
+                            if (status !== 5)
+                                continue;
+                            const image = code + ' ' + idN + '.jpg';
+                            const file = resolve(
+                                __dirname,
+                                "../../public",
+                                line.trim(),
+                                image,
+                            );
+                            if (!existsSync(file))
+                                continue;
+                            unlinkSync(file);
+                        }
+                    }
+                    return res.status(200).send({ data });
+                });
+            });
+    }
+}
+
+export function keysInfo(
+    {
+        user,
+        query: { code, desc, status, id: _id }
+    }: Request & {
+        query: {
+            code?: string;
+            desc?: string;
+            status?: string | number;
+            id?: string;
+        }
+    },
+    res: Response
+) {
+    if (!user?.roleIncludes('READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN'))
+        return res.status(423).send({
+            message: 'Access denied'
+        });
+    status = Number(status);
+    type response = {
+        status: {
+            defective: number;
+            found: number;
+            photographed: number;
+            prepared: number;
+            edited: number;
+            saved: number;
+        };
+        success: number;
+    };
+    KeyModel.aggregate<response>()
+        .lookup({
+            from: 'lines',
+            localField: 'line',
+            foreignField: '_id',
+            as: 'line'
+        })
+        .unwind('$line')
+        .lookup({
+            from: 'suppliers',
+            localField: 'line.supplier',
+            foreignField: '_id',
+            as: 'line.supplier'
+        })
+        .unwind('$line.supplier')
+        .project({
+            code: {
+                $concat: [
+                    '$line.identifier',
+                    '$line.supplier.identifier',
+                    '$code'
+                ]
+            },
+            desc: 1,
+            image: 1
+        })
+        .match({
+            ...(
+                (code || desc || !isNaN(status)) &&
+                {
+                    $and: [
+                        ...code
+                            ? [
+                                {
+                                    code: {
+                                        $regex: code,
+                                        $options: 'i',
+                                    }
+                                }
+                            ]
+                            : [],
+                        ...desc
+                            ? [
+                                {
+                                    desc: {
+                                        $regex: desc,
+                                        $options: 'i',
+                                    }
+                                }
+                            ]
+                            : [],
+                        ...(status >= 0 && status <= 5)
+                            ? [
+                                {
+                                    'image.status': status
+                                }
+                            ]
+                            : [],
+                    ],
+                }
+            ),
+        })
+        .facet({
+            status: [
+                {
+                    $unwind: {
+                        path: '$image'
+                    }
+                },
+                {
+                    $sortByCount: '$image.status'
+                }
+            ],
+            success: [
+                {
+                    $unwind: {
+                        path: '$image'
+                    }
+                },
+                {
+                    $match: {
+                        'image.status': 5
+                    }
+                },
+                {
+                    $group: {
+                        _id: {
+                            line: '$line',
+                            code: '$code'
+                        },
+                        image: {
+                            $first: '$image'
+                        }
+                    }
+                },
+                {
                     $group: {
                         _id: null,
                         count: {
                             $sum: 1
                         }
                     }
-                }]
-            }
-        }, {
-            $project: {
-                data: {
-                    $cond: {
-                        if: {
-                            $eq: ['$data', []]
-                        },
-                        then: null,
-                        else: '$data'
-                    }
-                },
-                total: {
-                    $cond: {
-                        if: {
-                            $eq: ['$total', []]
-                        },
-                        then: [{
-                            count: 0
-                        }],
-                        else: '$total'
-                    }
-                },
-            }
-        }, {
-            $unwind: {
-                path: '$total'
-            }
-        }, {
-            $project: {
-                data: 1,
-                totalDocs: '$total.count'
-            }
-        })).exec((err, [{ data, totalDocs }]: { data: LeanDocument<IKey>[]; totalDocs: number }[]) => {
-            if (err)
-                return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data)
-                return res.status(404).send({ message: 'Document not found' });
-
-            const totalPages = Math.ceil(totalDocs / config.LIMIT.KEY);
-            const hasNextPage = totalPages > page;
-            const hasPrevPage = page > 1;
-            return res.status(200).send({
-                data,
-                metadata: {
-                    totalDocs,
-                    limit: config.LIMIT.KEY,
-                    page,
-                    nextPage: hasNextPage ? page + 1 : null,
-                    prevPage: hasPrevPage ? page - 1 : null,
-                    hasNextPage,
-                    hasPrevPage,
-                    totalPages
                 }
-            });
-        });
-    } else if (query?.id) {
-        KeyModel
-            .findOne()
-            .where('_id')
-            .equals(query.id)
-            .populate({
-                path: 'line',
-                select: 'identifier',
-                populate: {
-                    path: 'supplier',
-                    select: 'identifier',
-                }
-            })
-            .exec((err, data) => {
-                if (err)
-                    return res.status(409).send({ message: 'Internal error, probably error with params' });
-                if (!data)
-                    return res.status(404).send({ message: 'Document not found' });
-                return res.status(200).send({ data });
-            });
-    } else {
-        KeyModel
-            .find()
-            .populate({
-                path: 'line',
-                select: 'identifier',
-                populate: {
-                    path: 'supplier',
-                    select: 'identifier',
-                }
-            })
-            .exec((err, data) => {
-                if (err)
-                    return res.status(409).send({ message: 'Internal error, probably error with params' });
-                if (!data)
-                    return res.status(404).send({ message: 'Document not found' });
-                return res.status(200).send({ data });
-            });
-    }
-}
-
-export async function updateKey({ user, body, query }: Request, res: Response) {
-    if (!user?.roleIncludes(['EDIT', 'GRANT', 'ADMIN']))
-        return res.status(423).send({ message: 'Access denied' });
-    if (!Types.ObjectId.isValid(<string>query?.id) || !body?.line)
-        return res.status(400).send({ message: 'Client has not sent params' });
-
-    body.line = await LineModel.findByIdentifier(body.line).catch(() => {
-        return res.status(400).send({ message: 'Client has not sent params' });
-    });
-
-    KeyModel.findOneAndUpdate({ _id: query.id }, body, { new: true })
-        .populate({
-            path: 'line',
-            select: 'identifier',
-            populate: {
-                path: 'supplier',
-                select: 'identifier',
-            }
+            ],
         })
-        .exec((err, data) => {
-            if (err)
-                return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data)
-                return res.status(404).send({ message: 'Document not found' });
-            return res.status(200).send({ data });
-        });
-}
-
-export function deleteKey({ user, query }: Request, res: Response) {
-    if (!user?.roleIncludes('ADMIN'))
-        return res.status(423).send({ message: 'Access denied' });
-    if (!Types.ObjectId.isValid(<string>query?.id))
-        return res.status(400).send({ message: 'Client has not sent params' });
-    KeyModel.findOneAndDelete({ _id: query.id })
-        .exec(async (err, data) => {
-            if (err)
-                return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data)
-                return res.status(404).send({ message: 'Document not found' });
-
-            await Promise.all(
-                data.image
-                    .filter(i => i.public_id)
-                    .map(async i => {
-                        return await v2.uploader
-                            .destroy(<string>i.public_id)
-                            .catch(e => e);
-                    })
-            ).catch(() => {
-                return res.status(409).send({ message: 'Batch removal process has failed' });
-            });
-            return res.status(200).send({ data });
-        });
-}
-
-export async function resetKey({ user, query, body }: Request, res: Response) {
-    if (!user?.roleIncludes('ADMIN'))
-        return res.status(423).send({ message: 'Access denied' });
-    const image = new Array<LeanDocument<IImageFile>>();
-    if (!isNaN(body?.status) && body.status >= 0 && body.status < 5)
-        for (let idN = 0; idN < 3; idN++)
-            image.push({ idN, status: body.status });
-
-    if (Types.ObjectId.isValid(<string>query?.id)) {
-        KeyModel.findOneAndUpdate({
-            _id: query.id
-        }, {
-            $set: {
-                image
-            }
-        }).exec(async (err, data) => {
-            if (err)
-                return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (!data)
-                return res.status(404).send({ message: 'Document not found' });
-
-            await Promise.all(
-                data.image
-                    .filter(i => i.public_id)
-                    .map(async i => {
-                        return await v2.uploader
-                            .destroy(<string>i.public_id)
-                            .catch(e => e);
-                    })
-            ).catch(() => {
-                return res.status(409).send({ message: 'Batch removal process has failed' });
-            });
-            return res.status(200).send({ data });
-        });
-    } else {
-        const keys = await KeyModel.find({
-            image: {
-                $gt: []
-            }
-        }).select('image');
-
-        KeyModel.updateMany({
-            image: {
-                $gt: []
-            }
-        }, {
-            $set: {
-                image
-            }
-        }).exec(async (err, data) => {
-            if (err)
-                return res.status(409).send({ message: 'Internal error, probably error with params' });
-            if (data.nModified === 0)
-                return res.status(404).send({ message: 'Document not found' });
-
-            await Promise.all(
-                keys.map(async k => await Promise.all(
-                    k.image
-                        .filter(i => i.public_id)
-                        .map(async i => {
-                            return await v2.uploader
-                                .destroy(<string>i.public_id)
-                                .catch(e => e);
-                        })
-                ))
-            ).catch(() => {
-                return res.status(409).send({ message: 'Batch removal process has failed' });
-            });
-            return res.status(200).send({ data: keys });
-        });
-    }
-}
-
-export function keysInfo({ user, query }: Request, res: Response) {
-    if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
-        return res.status(423).send({ message: 'Access denied' });
-
-    const pipeline = new Array<unknown>({
-        $lookup: {
-            from: 'lines',
-            localField: 'line',
-            foreignField: '_id',
-            as: 'line'
-        }
-    }, {
-        $unwind: {
-            path: '$line'
-        }
-    }, {
-        $lookup: {
-            from: 'suppliers',
-            localField: 'line.supplier',
-            foreignField: '_id',
-            as: 'line.supplier'
-        }
-    }, {
-        $unwind: {
-            path: '$line.supplier'
-        }
-    }, {
-        $project: {
-            code: {
-                $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
-            },
-            desc: 1,
-            image: 1
-        }
-    });
-
-    const $and = new Array<unknown>();
-
-    if (query?.code)
-        $and.push({
-            code: {
-                $regex: query.code,
-                $options: 'i'
-            }
-        });
-
-    if (query?.desc)
-        $and.push({
-            desc: {
-                $regex: query.desc,
-                $options: 'i'
-            }
-        });
-
-    if (query?.status && !isNaN(+query.status) && +query.status >= 0 && +query.status < 6)
-        $and.push({ 'image.status': +query.status });
-
-    if ($and.length > 0)
-        pipeline.push({
-            $match: {
-                $and
-            }
-        });
-
-    KeyModel.aggregate(pipeline.concat({
-        $facet: {
-            status: [{
-                $unwind: {
-                    path: '$image'
-                }
-            }, {
-                $group: {
-                    _id: '$image.status',
-                    count: {
-                        $sum: 1
-                    }
-                }
-            }],
-            success: [{
-                $unwind: {
-                    path: '$image'
-                }
-            }, {
-                $match: {
-                    'image.status': 5
-                }
-            }, {
-                $group: {
-                    _id: {
-                        line: '$line',
-                        code: '$code'
-                    },
-                    image: {
-                        $first: '$image'
-                    }
-                }
-            }, {
-                $group: {
-                    _id: null,
-                    count: {
-                        $sum: 1
-                    }
-                }
-            }]
-        }
-    }, {
-        $project: {
+        .project({
             status: {
                 $cond: {
                     if: {
@@ -515,19 +798,13 @@ export function keysInfo({ user, query }: Request, res: Response) {
                     if: {
                         $eq: ['$success', []]
                     },
-                    then: [{
-                        count: 0
-                    }],
-                    else: '$success'
+                    then: 0,
+                    else: '$success.count'
                 }
             }
-        }
-    }, {
-        $unwind: {
-            'path': '$success'
-        }
-    }, {
-        $project: {
+        })
+        .unwind('$success')
+        .project({
             status: {
                 defective: {
                     $ifNull: ['$status.defective', 0]
@@ -548,76 +825,79 @@ export function keysInfo({ user, query }: Request, res: Response) {
                     $ifNull: ['$status.saved', 0]
                 }
             },
-            success: '$success.count'
-        }
-    })).exec((err, [data]: keyInfo[]) => {
-        if (err)
-            return res.status(409).send({ message: 'Internal error, probably error with params' });
-
-        return res.status(200).send({ data });
-
-    });
+            success: 1,
+        })
+        .exec((err, [data]) => {
+            if (err)
+                return res.status(409).send({
+                    message: 'Internal error, probably error with params'
+                });
+            return res.status(200).send({ data });
+        });
 }
 
-export function nextLast({ user, params }: Request, res: Response) {
-    if (!user?.roleIncludes(['READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN']))
-        return res.status(423).send({ message: 'Access denied' });
-    if (params?.code.length !== 10)
-        return res.status(400).send({ message: 'Client has not sent params' });
+export function nextLast(
+    {
+        user,
+        params: { code },
+    }: Request & {
+        params: {
+            code?: string;
+        }
+    },
+    res: Response
+) {
+    if (!user?.roleIncludes('READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN'))
+        return res.status(423).send({
+            message: 'Access denied'
+        });
+    if (!code || !/^([A-Z0-9]{6}|[A-Z0-9]{5}\s)[A-Z0-9]{4}$/.test(code))
+        return res.status(400).send({
+            message: 'Client has not sent params'
+        });
 
-    KeyModel.aggregate([{
-        $lookup: {
+    KeyModel.aggregate<LeanDocument<IKey>>()
+        .lookup({
             from: 'lines',
             localField: 'line',
             foreignField: '_id',
             as: 'line'
-        }
-    }, {
-        $unwind: {
-            path: '$line'
-        }
-    }, {
-        $lookup: {
+        })
+        .unwind('$line')
+        .lookup({
             from: 'suppliers',
             localField: 'line.supplier',
             foreignField: '_id',
             as: 'line.supplier'
-        }
-    }, {
-        $unwind: {
-            path: '$line.supplier'
-        }
-    }, {
-        $project: {
+        })
+        .unwind('$line.supplier')
+        .project({
             code: {
-                $concat: ['$line.identifier', '$line.supplier.identifier', '$code']
+                $concat: [
+                    '$line.identifier',
+                    '$line.supplier.identifier',
+                    '$code'
+                ]
             },
             desc: 1,
             image: 1
-        }
-    }, {
-        $sort: {
-            code: 1
-        }
-    }, {
-        $match: {
-            $and: [{
-                code: {
-                    $regex: `^${params.code.slice(0, 6)}`
-                }
-            }, {
-                code: {
-                    $gt: params.code
-                }
-            }]
-        }
-    }, {
-        $limit: 1
-    }]).exec((err, [data]: LeanDocument<IKey>[]) => {
-        if (err)
-            return res.status(409).send({ message: 'Internal error, probably error with params' });
-        if (!data)
-            return res.status(404).send({ message: 'Document not found' });
-        return res.status(200).send({ data });
-    });
+        })
+        .sort('code')
+        .match({
+            code: {
+                $gt: code.toUpperCase()
+            }
+        })
+        .limit(1)
+        .exec((err, [data]) => {
+            if (err)
+                return res.status(409).send({
+                    message: 'Internal error, probably error with params'
+                });
+            if (!data)
+                return res.status(404).send({
+                    message: 'Document not found'
+                });
+            return res.status(200).send({ data });
+        })
 }

@@ -1,11 +1,11 @@
 {
     "name": "catalogo-backend-v2",
-    "version": "2.6.0",
+    "version": "2.7.0",
     "description": "API del catálogo de Grupo Roca",
-    "main": "index.js",
+    "main": "./dist/index.js",
     "scripts": {
-        "start": "node dist/index.js",
-        "dev": "tsc-watch --onSuccess \"node dist/index.js\"",
+        "start": "node ./dist/index.js",
+        "dev": "tsc-watch --onSuccess \"node ./dist/index.js\"",
         "docs": "apidoc -i src/ -o docs/ && cmd.exe /c start docs/index.html",
         "build": "tsc"
     },
@@ -19,34 +19,29 @@
     "license": "ISC",
     "dependencies": {
         "bcryptjs": "^2.4.3",
-        "cloudinary": "^1.26.2",
+        "canvas": "^2.9.3",
         "cors": "^2.8.5",
-        "dayjs": "^1.10.5",
-        "dotenv": "^8.6.0",
-        "express": "^4.17.1",
-        "fs-extra": "^9.1.0",
-        "helmet": "^3.23.3",
+        "dayjs": "^1.11.3",
+        "dotenv": "^16.0.1",
+        "express": "^4.18.1",
+        "helmet": "^5.1.0",
         "jsonwebtoken": "^8.5.1",
-        "mongoose": "^5.13.2",
+        "mongoose": "^6.4.3",
         "morgan": "^1.10.0",
         "multer": "^1.4.2",
-        "path": "^0.12.7",
-        "uuid": "^7.0.3"
+        "path": "^0.12.7"
     },
     "devDependencies": {
         "@types/bcryptjs": "^2.4.2",
-        "@types/cors": "^2.8.10",
-        "@types/dotenv": "^8.2.0",
-        "@types/express": "^4.17.12",
-        "@types/fs-extra": "^8.1.0",
-        "@types/helmet": "0.0.46",
-        "@types/jsonwebtoken": "^8.5.3",
-        "@types/morgan": "^1.9.2",
-        "@types/multer": "^1.4.6",
-        "@types/node": "^13.13.52",
-        "@types/uuid": "^7.0.5",
-        "apidoc": "^0.22.0",
-        "tsc-watch": "^4.4.0",
-        "typescript": "^3.9.10"
+        "@types/cors": "^2.8.12",
+        "@types/express": "^4.17.13",
+        "@types/helmet": "0.0.48",
+        "@types/jsonwebtoken": "^8.5.8",
+        "@types/morgan": "^1.9.3",
+        "@types/multer": "^1.4.7",
+        "@types/node": "^18.0.1",
+        "apidoc": "^0.51.1",
+        "tsc-watch": "^5.0.3",
+        "typescript": "^4.7.4"
     }
 }

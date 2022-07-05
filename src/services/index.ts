@@ -19,7 +19,7 @@ export function line() {
 
 export function title(title: string) {
     let out = `--- ${title} `;
-    out += _line.substr(out.length);
+    out += _line.substring(out.length);
     console.log(out);
 }
 

@@ -1,4 +1,4 @@
-import { Document, LeanDocument, Model, model, Schema } from 'mongoose';
+import { CallbackError, Document, LeanDocument, Model, model, Schema, Types } from 'mongoose';
 
 export interface ISupplier extends Document {
     readonly identifier: string;
@@ -7,40 +7,47 @@ export interface ISupplier extends Document {
 };
 
 export interface ISupplierModel extends Model<ISupplier> {
-    findByIdentifier(identifier: string): Promise<LeanDocument<ISupplier> | null>;
+    findByIdentifier(identifier: string): Promise<Types.ObjectId | null>;
 }
 
 const supplierSchema = new Schema<ISupplier, ISupplierModel>({
     identifier: {
         type: String,
         unique: true,
-        trim: true,
-        minlength: 3,
+        minlength: 2,
         maxlength: 3,
         uppercase: true
     },
 }, {
-    timestamps: true
+    timestamps: true,
+    autoIndex: true,
 });
 
 /*------------------------------------------------------------------*/
 
+
+supplierSchema.pre<ISupplier & { identifier: string; }>('save', function (next) {
+    this.identifier = this.identifier.padEnd(3, ' ');
+    return next();
+});
+
 supplierSchema.statics.findByIdentifier = function (identifier: string) {
-    return this.aggregate([
-        {
-            $match: {
-                identifier
-            }
-        }, {
-            $limit: 1
-        }
-    ]).then(([supplier]: LeanDocument<ISupplier>[]) => {
-        return supplier ?? null;
+    return new Promise<Types.ObjectId | null>(resolve => {
+        if (!/^[a-z0-9]{3}$/i.test(identifier))
+            return resolve(null);
+        this.aggregate<LeanDocument<ISupplier>>()
+            .match({
+                identifier: identifier.toUpperCase()
+            })
+            .project({ _id: 1 })
+            .exec((err, [{ _id }]) => {
+                if (err || !_id)
+                    return resolve(null)
+                return resolve(new Types.ObjectId(_id));
+            });
     });
 }
 
 /*------------------------------------------------------------------*/
 
 export const SupplierModel = model<ISupplier, ISupplierModel>('Supplier', supplierSchema) as ISupplierModel;
-
-SupplierModel.createIndexes();

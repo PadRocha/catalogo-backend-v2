@@ -1,39 +1,44 @@
-import { CallbackError, FilterQuery, Model } from "mongoose";
+import { CallbackError, FilterQuery, LeanDocument, Model } from "mongoose";
 
 export interface IFindAndDeleteMany<T> extends Model<T> {
-    findAndDeleteMany(filter: FilterQuery<T>, callback?: (err: CallbackError, res: T[] | null) => void): Promise<T[]>;
+    findAndDeleteMany(filter: FilterQuery<T>): Promise<LeanDocument<T>[]>;
+    findAndDeleteMany(filter: FilterQuery<T>, callback?: (err: CallbackError, res: LeanDocument<T>[] | null) => void): void;
 }
 
-export function findAndDeleteMany(this: Model<any>, filter: FilterQuery<any>, callback: (err: CallbackError, res: any[] | null) => void) {
+export function findAndDeleteMany(
+    this: Model<any>,
+    filter: FilterQuery<any>,
+    callback: (err: CallbackError, res: any[] | null) => void
+) {
     const find = this.find();
     find.setQuery(filter);
     return new Promise((resolve, reject) => {
-        find.exec((findError, findData) => {
+        find.lean().exec((findError, findData) => {
             if (findError) {
                 if (callback)
-                    callback(findError, null);
+                    return callback(findError, null);
 
-                reject(findError)
+                return reject(findError)
             }
 
             if (!findData) {
                 if (callback)
-                    callback(findError, findData);
+                    return callback(findError, findData);
 
-                resolve(findData);
+                return resolve(findData);
             }
 
             this.deleteMany(filter).exec(deleteError => {
                 if (deleteError) {
                     if (callback)
-                        callback(deleteError, null);
+                        return callback(deleteError, null);
 
-                    reject(deleteError);
+                    return reject(deleteError);
                 } else {
                     if (callback)
-                        callback(deleteError, findData);
+                        return callback(deleteError, findData);
 
-                    resolve(findData);
+                    return resolve(findData);
                 }
             });
         });

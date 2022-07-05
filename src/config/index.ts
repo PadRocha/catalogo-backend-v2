@@ -1,12 +1,13 @@
-import dotenv from 'dotenv';
+import { config as configuration } from 'dotenv';
+import { Secret } from 'jsonwebtoken';
 
-dotenv.config();
+configuration();
 
 export const config = {
     ENV: process.env.NODE_ENV || 'development',
     PORT: Number(process.env.PORT) || 5885,
     KEY: {
-        SECRET: process.env.SECRET_KEY || '//password',
+        SECRET: (process.env.SECRET_KEY || '//password') as Secret,
         SALT: Number(process.env.SALT) || 11,
     },
     MONGO: {

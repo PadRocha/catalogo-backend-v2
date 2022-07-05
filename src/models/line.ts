@@ -1,20 +1,20 @@
-import { Document, Types, LeanDocument, Model, model, Schema } from 'mongoose';
+import { Document, isValidObjectId, LeanDocument, Model, model, Schema, Types } from 'mongoose';
 import { findAndDeleteMany, IFindAndDeleteMany } from '../services/findAndDeleteMany';
 import { KeyModel } from './key';
 import { SupplierModel } from './supplier';
 
 export interface ILine extends Document {
     readonly identifier: string;
-    supplier: string;
+    readonly supplier: string;
     readonly name: string;
     readonly createdAt: Date;
     readonly updatedAt: Date;
-    countKeys: number;
+    readonly countKeys: number;
 };
 
 export interface ILineModel extends Model<ILine>, IFindAndDeleteMany<ILine> {
     totalKey(id: string): Promise<number>;
-    findByIdentifier(identifier: string): Promise<LeanDocument<ILine> | null>;
+    findByIdentifier(identifier: string): Promise<Types.ObjectId | null>;
 }
 
 const lineSchema = new Schema<ILine, ILineModel>({
@@ -26,19 +26,21 @@ const lineSchema = new Schema<ILine, ILineModel>({
         uppercase: true
     },
     supplier: {
-        type: Schema.Types.ObjectId,
+        type: Schema.Types.Mixed,
         ref: 'Supplier',
         required: true,
         validate: {
-            async validator(_id: string): Promise<boolean> {
-                if (!Types.ObjectId.isValid(_id)) return false;
-                return await SupplierModel
-                    .exists({ _id })
-                    .then(exists => exists)
-                    .catch(err => { throw err });
+            validator(_id: string) {
+                return new Promise<boolean>(resolve => {
+                    if (!isValidObjectId(_id))
+                        return resolve(false);
+                    LineModel.exists({ _id }).exec((err, line) => {
+                        return resolve(!err && !!line);
+                    });
+                });
             },
             message: ({ value }: { value: string }) => `Supplier "${value}" no exists.'`,
-            reason: 'Invalid Supplier',
+            msg: 'Invalid Supplier',
         },
     },
     name: {
@@ -47,7 +49,8 @@ const lineSchema = new Schema<ILine, ILineModel>({
         trim: true,
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    autoIndex: true,
 });
 
 lineSchema.index({ identifier: 1, supplier: 1 }, { unique: true });
@@ -56,48 +59,58 @@ lineSchema.index({ identifier: 1, supplier: 1 }, { unique: true });
 
 lineSchema.statics.findAndDeleteMany = findAndDeleteMany;
 
-lineSchema.statics.totalKey = async function (_id: string): Promise<number> {
-    return await KeyModel
-        .countDocuments()
-        .where('line')
-        .equals(_id)
-        .then(Docs => Docs)
-        .catch(err => { throw err });
+lineSchema.statics.totalKey = async function (line: string): Promise<number> {
+    return new Promise<number>(resolve => {
+        KeyModel.aggregate<{ count: number }>()
+            .match({
+                line: new Types.ObjectId(line)
+            })
+            .group({
+                _id: null,
+                count: {
+                    $sum: 1
+                },
+            })
+            .exec((err, [{ count }]) => {
+                if (err || !count)
+                    return resolve(0);
+                return resolve(count);
+            });
+    });
 }
 
 lineSchema.statics.findByIdentifier = function (identifier: string) {
-    if (!identifier || identifier?.length !== 6)
-        return new Promise(resolve => resolve(undefined));
-
-    const line = identifier.slice(0, 3);
-    const supplier = identifier.slice(3, 6);
-    return this.aggregate([
-        {
-            $lookup: {
+    return new Promise<Types.ObjectId | null>(resolve => {
+        if (!/^[a-z0-9]{5,6}$/i.test(identifier))
+            return resolve(null);
+        this.aggregate<LeanDocument<ILine>>()
+            .lookup({
                 from: 'suppliers',
                 localField: 'supplier',
                 foreignField: '_id',
                 as: 'supplier'
-            }
-        }, {
-            $unwind: {
-                path: '$supplier'
-            }
-        }, {
-            $match: {
-                identifier: line,
-                'supplier.identifier': supplier
-            }
-        }, {
-            $limit: 1
-        }
-    ]).then(([line]: LeanDocument<ILine>[]) => {
-        return line ?? null;
+            })
+            .unwind('$supplier')
+            .project({
+                identifier: {
+                    $concat: [
+                        '$identifier',
+                        '$supplier.identifier'
+                    ]
+                }
+            })
+            .match({
+                identifier: identifier.toUpperCase()
+            })
+            .project({ _id: 1 })
+            .exec((err, [{ _id }]) => {
+                if (err || !_id)
+                    return resolve(null)
+                return resolve(new Types.ObjectId(_id));
+            })
     });
 }
 
 /*------------------------------------------------------------------*/
 
-export const LineModel = model<ILine, ILineModel>('Line', lineSchema) as ILineModel;
-
-LineModel.createIndexes();
+export const LineModel = model<ILine, ILineModel>('Line', lineSchema);

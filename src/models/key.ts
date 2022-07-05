@@ -1,16 +1,15 @@
-import { Document, Types, Model, model, Schema, CallbackError } from 'mongoose';
-import { findAndDeleteMany, IFindAndDeleteMany } from '../services/findAndDeleteMany';
-import { IImage } from './image';
-import { LineModel } from './line';
+import { Document, isValidObjectId, model, Model, PipelineStage, Schema } from "mongoose";
+import { findAndDeleteMany, IFindAndDeleteMany } from "../services/findAndDeleteMany";
+import { LineModel } from "./line";
 
-export interface IImageFile extends IImage {
-    idN: number;
-    status: number;
+export interface IImageFile {
+    readonly idN?: number;
+    readonly status?: number;
 }
 
 export interface IKey extends Document {
     readonly line: string;
-    code: string;
+    readonly code: string;
     readonly desc: string;
     readonly image: IImageFile[];
     readonly createdAt: Date;
@@ -30,25 +29,30 @@ export interface keyInfo {
 }
 
 export interface IKeyModel extends Model<IKey>, IFindAndDeleteMany<IKey> {
-    totalSuccess(pipeline: unknown[]): Promise<number>;
-    countStatus(pipeline: unknown[], status: 0 | 1 | 2 | 3 | 4 | 5): Promise<number>;
+    totalSuccess(match: PipelineStage.Match): Promise<number>;
+    countStatus(status: 0 | 1 | 2 | 3 | 4 | 5, match: PipelineStage.Match): Promise<number>;
 }
 
 const keySchema = new Schema<IKey, IKeyModel>({
     line: {
-        type: Schema.Types.ObjectId,
+        type: Schema.Types.Mixed,
         ref: 'Line',
         required: true,
         validate: {
-            async validator(_id: string): Promise<boolean> {
-                if (!Types.ObjectId.isValid(_id)) return false;
-                return await LineModel
-                    .exists({ _id })
-                    .then(exists => exists)
-                    .catch(err => { throw err });
+            validator(_id: string) {
+                return new Promise<boolean>(resolve => {
+                    if (!isValidObjectId(_id))
+                        return resolve(false);
+                    LineModel.exists({ _id }).exec((err, line) => {
+                        return resolve(!err && !!line);
+                    });
+                });
             },
-            message: ({ value }: { value: string }) => `Line "${value}" no exists.'`,
-            reason: 'Invalid Line',
+            message({ path, value }) {
+                console.log(path);
+                return `Line "${value}" no exists.'`;
+            },
+            msg: 'Invalid Line',
         },
     },
     code: {
@@ -76,14 +80,6 @@ const keySchema = new Schema<IKey, IKeyModel>({
                 default: 0,
                 required: true
             },
-            public_id: {
-                type: String,
-                default: null
-            },
-            url: {
-                type: String,
-                default: null
-            }
         }],
         _id: false,
         idN: true,
@@ -92,11 +88,12 @@ const keySchema = new Schema<IKey, IKeyModel>({
                 return images.length <= 3;
             },
             message: 'Array exceeds the limit of images',
-            reason: 'Image overflow',
+            msg: 'Image overflow',
         }
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    autoIndex: true,
 });
 
 keySchema.index({ code: 1, line: 1 }, { unique: true });
@@ -104,67 +101,62 @@ keySchema.index({ _id: 1, 'image.idN': 1 }, { unique: true });
 
 /*------------------------------------------------------------------*/
 
-keySchema.pre<IKey>('save', function (next: (err?: CallbackError) => void) {
-    const interaction = (4 - this.code.toString().length);
-    for (let i = 0; i < interaction; i++) {
-        this.code = '0' + this.code;
-    }
-
+keySchema.pre<IKey & { code: string; }>('save', function (next) {
+    this.code = this.code.padStart(4, '0')
     return next();
 });
 
 keySchema.statics.findAndDeleteMany = findAndDeleteMany;
 
-keySchema.statics.totalSuccess = function (pipeline: unknown[]) {
-    return this.aggregate(pipeline.concat({
-        $unwind: {
-            path: '$image'
-        }
-    }, {
-        $match: {
-            'image.status': 5
-        }
-    }, {
-        $group: {
-            _id: {
-                line: '$line',
-                code: '$code'
-            },
-            image: {
-                $first: '$image'
-            }
-        }
-    }, {
-        $group: {
-            _id: null,
-            count: {
-                $sum: 1
-            }
-        }
-    })).then((res: { count: number }[]) => res?.pop()?.count ?? 0);
+keySchema.statics.totalSuccess = function (match: PipelineStage.Match) {
+    return new Promise<number>(resolve => {
+        this.aggregate<{ count: number }>()
+            .match(match)
+            .unwind('$image')
+            .match({ 'image.status': 5 })
+            .group({
+                _id: {
+                    line: '$line',
+                    code: '$code'
+                },
+                image: {
+                    $first: '$image'
+                },
+            })
+            .group({
+                _id: null,
+                count: {
+                    $sum: 1
+                },
+            })
+            .exec((err, [{ count }]) => {
+                if (err || !count)
+                    return resolve(0);
+                return resolve(count);
+            });
+    });
 }
 
-keySchema.statics.countStatus = function (pipeline: unknown[], status: number) {
-    return this.aggregate(pipeline.concat({
-        $unwind: {
-            path: '$image'
-        }
-    }, {
-        $match: {
-            'image.status': status
-        }
-    }, {
-        $group: {
-            _id: null,
-            count: {
-                $sum: 1
-            }
-        }
-    })).then((res: { count: number }[]) => res?.pop()?.count ?? 0);
+keySchema.statics.countStatus = function (status: number, match: PipelineStage.Match) {
+    return new Promise<number>(resolve => {
+        this.aggregate<{ count: number }>()
+            .match(match)
+            .unwind('$image')
+            .match({ 'image.status': status })
+            .group({
+                _id: null,
+                count: {
+                    $sum: 1
+                }
+            })
+            .exec((err, [{ count }]) => {
+                if (err || !count)
+                    return resolve(0);
+                return resolve(count);
+            });
+    });
 }
 
 /*------------------------------------------------------------------*/
 
-export const KeyModel = model<IKey, IKeyModel>('Key', keySchema) as IKeyModel;
-
-KeyModel.createIndexes();
+export const KeyModel = model<IKey, IKeyModel>('Key', keySchema);

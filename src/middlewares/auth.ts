@@ -1,9 +1,8 @@
 import dayjs from 'dayjs';
 import { Request, Response } from 'express';
-import { Secret, verify } from 'jsonwebtoken';
-
-import { config } from '../config/config';
-import { UserModel, IUser, Token } from '../models/user';
+import { verify } from 'jsonwebtoken';
+import { config } from '../config';
+import { IUser, Token, UserModel } from '../models/user';
 
 export async function authorized(req: Request, res: Response, next: (err?: Error) => void) {
   if (!req.headers.authorization?.startsWith('Bearer'))
@@ -13,7 +12,7 @@ export async function authorized(req: Request, res: Response, next: (err?: Error
   if (!token)
     return res.status(403).send({ message: 'The user does not have the necessary credentials for this operation' });
   try {
-    var payload: Token = <Token>verify(token, <Secret>config.KEY.SECRET);
+    var payload: Token = <Token>verify(token, config.KEY.SECRET);
     const user: IUser | null = await UserModel.findById(payload.sub).select('-password');
     if (
       !user ||
@@ -27,6 +26,7 @@ export async function authorized(req: Request, res: Response, next: (err?: Error
     req.user = user;
   } catch {
     return res.status(409).send({ message: 'Error decrypting token' });
+  } finally {
+    return next();
   }
-  return next();
 }

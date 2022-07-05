@@ -1,17 +1,22 @@
 import { Router } from 'express';
-
-import * as userController from '../controllers/user';
-import * as supplierController from '../controllers/supplier';
-import * as lineController from '../controllers/line';
-import * as keyController from '../controllers/key';
-import * as statusController from '../controllers/status';
 import * as imageController from '../controllers/image';
-import * as migrationController from '../controllers/migration';
+import * as lineController from '../controllers/line';
+import * as statusController from '../controllers/status';
+import * as supplierController from '../controllers/supplier';
+import * as userController from '../controllers/user';
 import { authorized } from '../middlewares/auth';
+
+// import * as lineController from '../controllers/line';
+// import * as keyController from '../controllers/key';
+// import * as statusController from '../controllers/status';
+// import * as imageController from '../controllers/image';
+// import * as migrationController from '../controllers/migration';
+// import { authorized } from '../middlewares/auth';
 
 //*------------------------------------------------------------------*/
 // * Api Routes
 //*------------------------------------------------------------------*/
+
 const router = Router();
 
 //*------------------------------------------------------------------*/
@@ -57,27 +62,27 @@ router.route('/line/:id/reset')
 // * Api Key
 //*------------------------------------------------------------------*/
 
-router.route('/key')
-    .post(authorized, keyController.saveKey)
-    .get(authorized, keyController.listKey)
-    .put(authorized, keyController.updateKey)
-    .delete(authorized, keyController.deleteKey);
+// router.route('/key')
+//     .post(authorized, keyController.saveKey)
+//     .get(authorized, keyController.listKey)
+//     .put(authorized, keyController.updateKey)
+//     .delete(authorized, keyController.deleteKey);
 
-router.route('/key/reset')
-    .put(authorized, keyController.resetKey);
+// router.route('/key/reset')
+//     .put(authorized, keyController.resetKey);
 
-router.route('/key/info')
-    .get(authorized, keyController.keysInfo);
+// router.route('/key/info')
+//     .get(authorized, keyController.keysInfo);
 
-router.route('/key/:code/next')
-    .get(authorized, keyController.nextLast)
+// router.route('/key/:code/next')
+//     .get(authorized, keyController.nextLast)
 
 router.route('/status/:key/:idN')
     .put(authorized, statusController.updateStatus);
 
-router.route('/image/:key/:idN')
+router.route('/image/:id/:idN')
     .put(authorized, imageController.updateImage)
-    .delete(authorized, imageController.deleteImage);
+//     .delete(authorized, imageController.deleteImage);
 
 //*------------------------------------------------------------------*/
 // * Migration
@@ -93,4 +98,4 @@ router.route('/image/:key/:idN')
 
 /*------------------------------------------------------------------*/
 
-export default router;
+export const api = router;
