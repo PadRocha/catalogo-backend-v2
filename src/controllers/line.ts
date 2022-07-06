@@ -418,7 +418,6 @@ export async function resetLine(
         return res.status(400).send({
             message: 'Client has not sent params'
         });
-
     const total = !!status && !isNaN(status) && status >= 0 && status < 5
         ? 3
         : 0;

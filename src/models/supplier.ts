@@ -1,4 +1,4 @@
-import { CallbackError, Document, LeanDocument, Model, model, Schema, Types } from 'mongoose';
+import { Document, LeanDocument, Model, model, Schema, Types } from 'mongoose';
 
 export interface ISupplier extends Document {
     readonly identifier: string;
@@ -25,7 +25,6 @@ const supplierSchema = new Schema<ISupplier, ISupplierModel>({
 
 /*------------------------------------------------------------------*/
 
-
 supplierSchema.pre<ISupplier & { identifier: string; }>('save', function (next) {
     this.identifier = this.identifier.padEnd(3, ' ');
     return next();
@@ -50,4 +49,4 @@ supplierSchema.statics.findByIdentifier = function (identifier: string) {
 
 /*------------------------------------------------------------------*/
 
-export const SupplierModel = model<ISupplier, ISupplierModel>('Supplier', supplierSchema) as ISupplierModel;
+export const SupplierModel = model<ISupplier, ISupplierModel>('Supplier', supplierSchema);

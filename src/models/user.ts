@@ -1,5 +1,5 @@
-import { CallbackError, Document, Model, model, Schema } from 'mongoose';
-import { Secret, sign } from 'jsonwebtoken';
+import { Document, Model, model, Schema } from 'mongoose';
+import { sign } from 'jsonwebtoken';
 import bcryptjs from 'bcryptjs';
 import dayjs from 'dayjs';
 

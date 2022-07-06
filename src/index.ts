@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { connect, ConnectOptions } from 'mongoose';
-import { join } from 'path';
+import { resolve } from 'path';
 import { exit } from 'process';
 import { app } from './app';
 import { config } from './config';
@@ -28,7 +28,7 @@ const dbOptions: ConnectOptions = {
 (async () => {
     try {
         const simba = readFileSync(
-            join(__dirname, '../assets/Simba-ASCII-78-black.ans')
+            resolve(__dirname, '../assets/Simba-ASCII-78-black.ans')
         );
         console.log(simba.toString('utf8'));
 
