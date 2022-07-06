@@ -1,11 +1,11 @@
-import cors from "cors";
-import express, { Request, Response } from "express";
-import helmet from "helmet";
-import morgan from "morgan";
-import multer from "multer";
-import { extname, join } from "path";
-import { config } from "./config";
-import { api } from "./routes/api.routes";
+import cors from 'cors';
+import express, { Request, Response } from 'express';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import multer from 'multer';
+import { extname, join } from 'path';
+import { config } from './config';
+import { api } from './routes/api.routes';
 
 const app = express();
 

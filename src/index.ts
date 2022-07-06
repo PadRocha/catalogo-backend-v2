@@ -1,10 +1,10 @@
-import { readFileSync } from "fs";
-import { connect, ConnectOptions } from "mongoose";
-import { join } from "path";
-import { exit } from "process";
-import { app } from "./app";
-import { config } from "./config";
-import { field, sep, title } from "./services";
+import { readFileSync } from 'fs';
+import { connect, ConnectOptions } from 'mongoose';
+import { join } from 'path';
+import { exit } from 'process';
+import { app } from './app';
+import { config } from './config';
+import { field, sep, title } from './services';
 
 /**
  * #  ██████╗███████╗████████╗██████╗ ██╗ ██████╗ ██████╗    ██████╗ ██████╗  ██████╗ ██████╗ ██╗   ██╗ ██████╗████████╗██╗ ██████╗ ███╗   ██╗███████╗
@@ -28,22 +28,22 @@ const dbOptions: ConnectOptions = {
 (async () => {
     try {
         const simba = readFileSync(
-            join(__dirname, "../assets/Simba-ASCII-78-black.ans")
+            join(__dirname, '../assets/Simba-ASCII-78-black.ans')
         );
-        console.log(simba.toString("utf8"));
+        console.log(simba.toString('utf8'));
 
         sep();
-        title(`{${app.get("pkg").name}} - ${app.get("pkg").description}`);
+        title(`{${app.get('pkg').name}} - ${app.get('pkg').description}`);
 
         await connect(config.MONGO.URI, dbOptions)
             .catch(() => {
                 throw new Error('No se pudo conectar a base de datos.');
             });
-        field("\x1b[37mDatabase", "\x1b[33mconnected\x1b[0m");
+        field('\x1b[37mDatabase', '\x1b[33mconnected\x1b[0m');
 
-        const server = app.listen(app.get("port"));
-        field("\x1b[37mServer", `\x1b[33m${app.get("port")}\x1b[0m`);
-        field("\x1b[37mStatus", `\x1b[33m${app.get("env")}\x1b[0m`);
+        const server = app.listen(app.get('port'));
+        field('\x1b[37mServer', `\x1b[33m${app.get('port')}\x1b[0m`);
+        field('\x1b[37mStatus', `\x1b[33m${app.get('env')}\x1b[0m`);
     } catch (error) {
         if (error instanceof Error)
             console.info(`\x1b[31mError: \x1b[0m${error.message}`);

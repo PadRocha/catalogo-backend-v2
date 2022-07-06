@@ -1,5 +1,5 @@
-import { Document } from "mongoose";
-import { config } from "../config";
+import { Document } from 'mongoose';
+import { config } from '../config';
 
 type authRole = keyof typeof config.AUTH;
 

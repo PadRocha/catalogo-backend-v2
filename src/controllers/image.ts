@@ -167,15 +167,13 @@ export async function displayImage(
         const file_image = image_name.slice(6) + '.jpg';
         const path_file = resolve(
             __dirname,
-            "..",
-            "..",
-            "public",
+            '../../public',
             line,
             file_image,
         );
         if (!existsSync(path_file))
             return res.status(404).send({
-                message: "Image not found"
+                message: 'Image not found'
             });
         let file = readFileSync(path_file);
         const img = new Image();
@@ -184,18 +182,24 @@ export async function displayImage(
                 const canvas_width = Number(width);
                 const canvas_height = Number(height);
                 const canvas = createCanvas(canvas_width, canvas_height);
-                const ctx = canvas.getContext("2d");
+                const ctx = canvas.getContext('2d');
                 const { width: image_width, height: image_height } = img;
-                ctx.imageSmoothingQuality = "high";
-                ctx.quality = "best";
-                if (image_height < image_width) {
-                    const new_image_height = (canvas_width * image_height) / image_width;
-                    const top_y = (new_image_height - canvas_height) / 2;
-                    ctx.drawImage(img, 0, -top_y, canvas_width, new_image_height);
-                } else {
+                ctx.imageSmoothingQuality = 'high';
+                ctx.quality = 'best';
+                if (
+                    (image_height < image_width || image_height > image_width) &&
+                    canvas_height < canvas_width
+                ) {
                     const new_image_width = (canvas_height * image_width) / image_height;
                     const left_x = (new_image_width - canvas_width) / 2;
                     ctx.drawImage(img, -left_x, 0, new_image_width, canvas_height);
+                } else if (
+                    (image_height < image_width || image_height > image_width) &&
+                    canvas_height > canvas_width
+                ) {
+                    const new_image_height = (canvas_width * image_height) / image_width;
+                    const top_y = (new_image_height - canvas_height) / 2;
+                    ctx.drawImage(img, 0, -top_y, canvas_width, new_image_height);
                 }
                 file = canvas.toBuffer();
             } else if (!!width) {
@@ -203,9 +207,9 @@ export async function displayImage(
                 const canvas_width = Number(width);
                 const canvas_height = (canvas_width * image_height) / image_width;
                 const canvas = createCanvas(canvas_width, canvas_height);
-                const ctx = canvas.getContext("2d");
-                ctx.imageSmoothingQuality = "high";
-                ctx.quality = "best";
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingQuality = 'high';
+                ctx.quality = 'best';
                 ctx.drawImage(img, 0, 0, canvas_width, canvas_height);
                 file = canvas.toBuffer();
             } else if (!!height) {
@@ -213,16 +217,16 @@ export async function displayImage(
                 const canvas_height = Number(height);
                 const canvas_width = (canvas_height * image_width) / image_height;
                 const canvas = createCanvas(canvas_width, canvas_height);
-                const ctx = canvas.getContext("2d");
-                ctx.imageSmoothingQuality = "high";
-                ctx.quality = "best";
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingQuality = 'high';
+                ctx.quality = 'best';
                 ctx.drawImage(img, 0, 0, canvas_width, canvas_height);
                 file = canvas.toBuffer();
             }
         };
         img.onerror = () => {
             return res.status(409).send({
-                message: "Internal error"
+                message: 'Internal error'
             });
         };
         img.src = file;
@@ -310,13 +314,13 @@ export async function deleteImage(
         const image = data.code + ' ' + idN + '.jpg';
         const file = resolve(
             __dirname,
-            "../../public",
+            '../../public',
             line,
             image,
         );
         if (!existsSync(file))
             return res.status(404).send({
-                message: "Image not found"
+                message: 'Image not found'
             });
         unlinkSync(file);
         return res.status(200).send({ data });

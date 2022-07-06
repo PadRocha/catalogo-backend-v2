@@ -34,7 +34,7 @@ const lineSchema = new Schema<ILine, ILineModel>({
                 return new Promise<boolean>(resolve => {
                     if (!isValidObjectId(_id))
                         return resolve(false);
-                    LineModel.exists({ _id }).exec((err, line) => {
+                    SupplierModel.exists({ _id }).exec((err, line) => {
                         return resolve(!err && !!line);
                     });
                 });

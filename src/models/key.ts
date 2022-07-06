@@ -1,6 +1,6 @@
-import { Document, isValidObjectId, model, Model, PipelineStage, Schema } from "mongoose";
-import { findAndDeleteMany, IFindAndDeleteMany } from "../services/findAndDeleteMany";
-import { LineModel } from "./line";
+import { Document, isValidObjectId, model, Model, PipelineStage, Schema } from 'mongoose';
+import { findAndDeleteMany, IFindAndDeleteMany } from '../services/findAndDeleteMany';
+import { LineModel } from './line';
 
 export interface IImageFile {
     readonly idN?: number;

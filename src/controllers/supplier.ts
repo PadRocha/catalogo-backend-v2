@@ -1,10 +1,10 @@
-import { Request, Response } from "express";
-import { existsSync, unlinkSync } from "fs";
-import { isValidObjectId, LeanDocument, Types } from "mongoose";
-import { resolve } from "path";
-import { KeyModel } from "../models/key";
-import { LineModel } from "../models/line";
-import { ISupplier, SupplierModel } from "../models/supplier";
+import { Request, Response } from 'express';
+import { existsSync, unlinkSync } from 'fs';
+import { isValidObjectId, LeanDocument, Types } from 'mongoose';
+import { resolve } from 'path';
+import { KeyModel } from '../models/key';
+import { LineModel } from '../models/line';
+import { ISupplier, SupplierModel } from '../models/supplier';
 
 export async function saveSupplier(
     { user, body }: Omit<Request, 'body'> & {
@@ -127,7 +127,7 @@ export async function deleteSupplier(
                         const image = code + ' ' + idN + '.jpg';
                         const file = resolve(
                             __dirname,
-                            "../../public",
+                            '../../public',
                             line,
                             image,
                         );

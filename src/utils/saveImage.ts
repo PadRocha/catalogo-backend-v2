@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync } from "fs";
-import { LeanDocument } from "mongoose";
-import { extname, resolve } from "path";
-import { IKey } from "../models/key";
+import { mkdirSync, writeFileSync } from 'fs';
+import { LeanDocument } from 'mongoose';
+import { extname, resolve } from 'path';
+import { IKey } from '../models/key';
 
 export function saveImage(
     idN: number,
@@ -11,7 +11,7 @@ export function saveImage(
     const image = code + ' ' + idN + '.jpg';
     const directory = resolve(
         __dirname,
-        "../../public",
+        '../../public',
         line.trim(),
     );
     mkdirSync(directory, { recursive: true });

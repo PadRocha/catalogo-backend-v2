@@ -1,4 +1,4 @@
-import { CallbackError, FilterQuery, LeanDocument, Model } from "mongoose";
+import { CallbackError, FilterQuery, LeanDocument, Model } from 'mongoose';
 
 export interface IFindAndDeleteMany<T> extends Model<T> {
     findAndDeleteMany(filter: FilterQuery<T>): Promise<LeanDocument<T>[]>;

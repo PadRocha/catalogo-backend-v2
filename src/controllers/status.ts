@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { isValidObjectId, LeanDocument, Types } from 'mongoose';
-import { IKey, KeyModel } from "../models/key";
+import { IKey, KeyModel } from '../models/key';
 
 export async function updateStatus(
     {

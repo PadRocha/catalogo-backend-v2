@@ -413,7 +413,7 @@ export async function deleteKey(
             const image = data.code + ' ' + idN + '.jpg';
             const file = resolve(
                 __dirname,
-                "../../public",
+                '../../public',
                 data.line.trim(),
                 image,
             );
@@ -502,7 +502,7 @@ export async function resetKey(
                 const image = data.code + ' ' + idN + '.jpg';
                 const file = resolve(
                     __dirname,
-                    "../../public",
+                    '../../public',
                     data.line.trim(),
                     image,
                 );
@@ -557,7 +557,7 @@ export async function resetKey(
                 const image = code + ' ' + idN + '.jpg';
                 const file = resolve(
                     __dirname,
-                    "../../public",
+                    '../../public',
                     line.trim(),
                     image,
                 );

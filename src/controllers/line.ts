@@ -377,7 +377,7 @@ export async function deleteLine(
                     const image = code + ' ' + idN + '.jpg';
                     const file = resolve(
                         __dirname,
-                        "../../public",
+                        '../../public',
                         data.identifier.trim(),
                         image,
                     );
@@ -487,7 +487,7 @@ export async function resetLine(
                 const image = code + ' ' + idN + '.jpg';
                 const file = resolve(
                     __dirname,
-                    "../../public",
+                    '../../public',
                     line.trim(),
                     image,
                 );
