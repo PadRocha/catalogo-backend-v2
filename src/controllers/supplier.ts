@@ -6,8 +6,7 @@ import { KeyModel } from "../models/key";
 import { LineModel } from "../models/line";
 import { ISupplier, SupplierModel } from "../models/supplier";
 
-
-export function saveSupplier(
+export async function saveSupplier(
     { user, body }: Omit<Request, 'body'> & {
         body: LeanDocument<ISupplier>,
     },
@@ -21,39 +20,45 @@ export function saveSupplier(
         return res.status(400).send({
             message: 'Client has not sent params'
         });
-    new SupplierModel(body).save((err, data) => {
-        if (err)
-            return res.status(409).send({
-                message: 'Internal error, probably error with params'
-            });
+    try {
+        const data = await new SupplierModel(body).save();
         if (!data)
             return res.status(204).send({
                 message: 'Saved and is not returning any content'
             });
         return res.status(200).send({ data });
-    });
+    } catch {
+        return res.status(409).send({
+            message: 'Internal error, probably error with params'
+        });
+    }
 }
 
-export function listSupplier({ user }: Request, res: Response) {
+export async function listSupplier({ user }: Request, res: Response) {
     if (!user?.roleIncludes('READ', 'WRITE', 'EDIT', 'GRANT', 'ADMIN'))
         return res.status(423).send({
             message: 'Access denied'
         });
-    SupplierModel.find().exec((err, data) => {
-        if (err)
-            return res.status(409).send({
-                message: 'Internal error, probably error with params'
-            });
+    try {
+        const data = await SupplierModel.find().lean();
         if (!data)
             return res.status(404).send({
                 message: 'Document not found'
             });
         return res.status(200).send({ data });
-    });
+    } catch {
+        return res.status(409).send({
+            message: 'Internal error, probably error with params'
+        });
+    }
 }
 
-export function updateSupplier(
-    { user, body, query }: Omit<Request, 'body'> & {
+export async function updateSupplier(
+    {
+        user,
+        body,
+        query: { id: _id },
+    }: Omit<Request, 'body'> & {
         body: LeanDocument<ISupplier>,
         query: {
             id?: string;
@@ -65,28 +70,28 @@ export function updateSupplier(
         return res.status(423).send({
             message: 'Access denied'
         });
-    if (!isValidObjectId(query.id) || !body)
+    if (!isValidObjectId(_id) || !body)
         return res.status(400).send({
             message: 'Client has not sent params'
         });
-    SupplierModel.findOneAndUpdate({ _id: query.id }, body)
-        .exec((err, data) => {
-            if (err)
-                return res.status(409).send({
-                    message: 'Internal error, probably error with params'
-                });
-            if (!data)
-                return res.status(404).send({
-                    message: 'Document not found'
-                });
-            return res.status(200).send({ data });
+    try {
+        const data = await SupplierModel.findOneAndUpdate({ _id }, body).lean();
+        if (!data)
+            return res.status(404).send({
+                message: 'Document not found'
+            });
+        return res.status(200).send({ data });
+    } catch {
+        return res.status(409).send({
+            message: 'Internal error, probably error with params'
         });
+    }
 }
 
-export function deleteSupplier(
+export async function deleteSupplier(
     {
         user,
-        query: { id: _id, force }
+        query: { id: _id, force },
     }: Request & {
         query: {
             id?: string;
@@ -103,47 +108,40 @@ export function deleteSupplier(
         return res.status(400).send({
             message: 'Client has not sent params'
         });
-    SupplierModel.findOneAndDelete({ _id })
-        .lean()
-        .exec(async (err, supplier) => {
-            if (err)
-                return res.status(409).send({
-                    message: 'Internal error, probably error with params'
-                });
-            if (!supplier)
-                return res.status(404).send({
-                    message: 'Document not found'
-                });
-            if (force === 'delete')
-                try {
-                    const lines = await LineModel.findAndDeleteMany({ supplier: supplier._id });
-                    for await (const { _id, identifier } of lines) {
-                        const keys = await KeyModel.findAndDeleteMany({ line: _id });
-                        //TODO: Revisar si espera a todas estas acciones
-
-                        for (const { code, image } of keys) {
-                            for (const { idN, status } of image) {
-                                if (status !== 5)
-                                    continue;
-                                const line = identifier + supplier.identifier.trim();
-                                const image = code + ' ' + idN + '.jpg';
-                                const file = resolve(
-                                    __dirname,
-                                    "../../public",
-                                    line,
-                                    image,
-                                );
-                                if (!existsSync(file))
-                                    continue;
-                                unlinkSync(file);
-                            }
-                        }
+    try {
+        const data = await SupplierModel.findOneAndDelete({ _id }).lean();
+        if (!data)
+            return res.status(404).send({
+                message: 'Document not found'
+            });
+        if (force === 'delete') {
+            const lines = await LineModel.findAndDeleteMany({ supplier: data._id });
+            for await (const { _id: line, identifier } of lines) {
+                const keys = await KeyModel.findAndDeleteMany({ line });
+                //TODO: Revisar si espera a todas estas acciones
+                for (const { code, image } of keys) {
+                    for (const { idN, status } of image) {
+                        if (status !== 5)
+                            continue;
+                        const line = identifier + data.identifier.trim();
+                        const image = code + ' ' + idN + '.jpg';
+                        const file = resolve(
+                            __dirname,
+                            "../../public",
+                            line,
+                            image,
+                        );
+                        if (!existsSync(file))
+                            continue;
+                        unlinkSync(file);
                     }
-                } catch {
-                    return res.status(409).send({
-                        message: 'Batch removal process has failed'
-                    });
                 }
-            return res.status(200).send({ supplier });
+            }
+        }
+        return res.status(200).send({ data });
+    } catch {
+        return res.status(409).send({
+            message: 'Internal error, probably error with params'
         });
+    }
 }

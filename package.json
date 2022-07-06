@@ -5,9 +5,9 @@
     "main": "./dist/index.js",
     "scripts": {
         "start": "node ./dist/index.js",
-        "dev": "tsc-watch --onSuccess \"node ./dist/index.js\"",
+        "dev": "tsc-watch --onSuccess \"npm start\"",
         "docs": "apidoc -i src/ -o docs/ && cmd.exe /c start docs/index.html",
-        "build": "tsc"
+        "build": "tsc && uglifyjs-folder dist -eo dist -x .js"
     },
     "keywords": [],
     "author": {
@@ -42,6 +42,7 @@
         "@types/node": "^18.0.1",
         "apidoc": "^0.51.1",
         "tsc-watch": "^5.0.3",
-        "typescript": "^4.7.4"
+        "typescript": "^4.7.4",
+        "uglifyjs-folder": "^3.1.2"
     }
 }

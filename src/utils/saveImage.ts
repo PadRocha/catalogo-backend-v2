@@ -4,7 +4,7 @@ import { extname, resolve } from "path";
 import { IKey } from "../models/key";
 
 export function saveImage(
-    idN: string,
+    idN: number,
     { line, code }: LeanDocument<IKey>,
     { buffer }: Express.Multer.File
 ) {
