@@ -6,17 +6,26 @@ const _field = '                    ';
 const _arrow = '----->  ';
 const _tab = '        ';
 
+/**
+ * Muestra en consola una línea divisoria
+ */
 export function separator() {
     console.log(_sep);
-
 }
 
 export const sep = separator;
 
+/**
+ * Muestra en consola una línea
+ */
 export function line() {
     console.log(_line);
 }
 
+/**
+ * Muestra en consola un testo entre una línea
+ * @param title string
+ */
 export function title(title: string) {
     let out = `--- ${title} `;
     out += _line.substring(out.length);

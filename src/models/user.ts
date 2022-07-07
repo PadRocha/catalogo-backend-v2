@@ -12,7 +12,24 @@ export interface IUser extends Document, IRoles {
     password?: string;
     role?: number;
     roles?: (keyof typeof config.AUTH)[];
+    /**
+     * Retorna `true` si La clave de usuario es igual a la ingresada
+     * @param password string
+     * @returns boolean
+     * @example
+     * ```js
+     * User.comparePassword('pass');
+     * ```
+     */
     comparePassword(password: string | undefined): boolean;
+    /**
+     * Convierte el usuario actual en un token
+     * @returns string
+     * @example
+     * ```js
+     * User.createToken();
+     * ```
+     */
     createToken(): string;
 }
 
@@ -74,7 +91,6 @@ userSchema.methods.createToken = function (this: IUser & { role: number }): stri
         iat: dayjs().unix(),
         exp: dayjs().add(30, 'day').unix(),
     }
-
     return sign(payload, config.KEY.SECRET);
 }
 

@@ -7,6 +7,15 @@ export interface ISupplier extends Document {
 };
 
 export interface ISupplierModel extends Model<ISupplier> {
+    /**
+     * Retorna el _id de proveedor dependiendo de su ID
+     * @param identifier string
+     * @returns Types.ObjectId
+     * @example
+     * ```js
+     * SupplierModel.findByIdentifier('PVH');
+     * ```
+     */
     findByIdentifier(identifier: string): Promise<Types.ObjectId | null>;
 }
 

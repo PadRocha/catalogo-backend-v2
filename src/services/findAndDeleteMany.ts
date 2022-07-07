@@ -1,7 +1,30 @@
 import { CallbackError, FilterQuery, LeanDocument, Model } from 'mongoose';
 
 export interface IFindAndDeleteMany<T> extends Model<T> {
+    /**
+     * Retorma todos los documentos eliminados
+     * @param filter FilterQuery<T>
+     * @returns LeanDocument<T>
+     * @example
+     * ````js
+     * try {
+     *      const docs = await Model.findAndDeleteMany({ _id });
+     * } catch {
+     * }
+     * ````
+     */
     findAndDeleteMany(filter: FilterQuery<T>): Promise<LeanDocument<T>[]>;
+    /**
+     * Elimina los documentos y los regresa en un callback
+     * @param filter FilterQuery<T>
+     * @param callback Function
+     * @example
+     * ````js
+     * Model.findAndDeleteMany({ _id }, (err, res) => {
+     *      ...
+     * })
+     * ````
+     */
     findAndDeleteMany(filter: FilterQuery<T>, callback?: (err: CallbackError, res: LeanDocument<T>[] | null) => void): void;
 }
 

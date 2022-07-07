@@ -29,7 +29,28 @@ export interface keyInfo {
 }
 
 export interface IKeyModel extends Model<IKey>, IFindAndDeleteMany<IKey> {
+    /**
+     * Retorna el total de claves con una imagen que poseen el status 5
+     * @param match PipelineStage.Match
+     * @returns number
+     * @example
+     * ```js
+     * KeyModel.totalSuccess({});
+     * ```
+     * @deprecated Ya no se utiliza más, se implementó otra ruta para extraer esta información
+     */
     totalSuccess(match: PipelineStage.Match): Promise<number>;
+    /**
+     * Retorna el total de imágenes con dicho status
+     * @param status number
+     * @param match PipelineStage.Match
+     * @returns number
+     * @example
+     * ```js
+     * KeyModel.countStatus(0, {});
+     * ```
+     * @deprecated Ya no se utiliza más, se implementó otra ruta para extraer esta información
+     */
     countStatus(status: 0 | 1 | 2 | 3 | 4 | 5, match: PipelineStage.Match): Promise<number>;
 }
 

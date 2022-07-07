@@ -13,7 +13,26 @@ export interface ILine extends Document {
 };
 
 export interface ILineModel extends Model<ILine>, IFindAndDeleteMany<ILine> {
+    /**
+     * Retorna el total de claves que poseen el _id de la línea
+     * @param id string
+     * @returns number
+     * @example
+     * ```js
+     * LineModel.totalKey('5f6d2656e8900400040e1f9e');
+     * ```
+     * @deprecated Ya no se utiliza más, se implementó otra ruta para extraer esta información
+     */
     totalKey(id: string): Promise<number>;
+    /**
+     * Retorna el _id de la línea dependiendo de su ID
+     * @param identifier string
+     * @returns Types.ObjectId
+     * @example
+     * ```js
+     * LineModel.findByIdentifier('GRA');
+     * ```
+     */
     findByIdentifier(identifier: string): Promise<Types.ObjectId | null>;
 }
 
